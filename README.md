@@ -105,45 +105,7 @@ Create Your IPTV M3U,JSON,M3U8  PLAYLIST EASY ALL IN ONE PLACE EXPORT AND IMPORT
 
 ---
 
-## 🧱 Branding GLOBALTV4YOU
 
-* **Título y nombre:** Cambia el `<title>` y el `<h1>` si quieres que diga “GLOBALTV4YOU”.
-* **Logotipo:** Añade tu logo en la cabecera, por ejemplo:
-
-  ```html
-  <header>
-    <img src="./logo-globaltv4you.png" alt="GLOBALTV4YOU" style="height:40px;vertical-align:middle"/>
-    <h1 style="display:inline-block;margin-left:8px">GLOBALTV4YOU — Mi TV Station</h1>
-  </header>
-  ```
-* **Colores de marca:** Edita las variables CSS del tema:
-
-  ```css
-  :root{
-    --bg:#0f1115;   /* Fondo */
-    --fg:#e6e8eb;   /* Texto */
-    --accent:#00ffd5; /* Acento (cámbialo por tu color de marca) */
-  }
-  ```
-* **Metadatos y SEO:**
-
-  ```html
-  <meta name="description" content="GLOBALTV4YOU — App IPTV con playlists M3U, HLS.js y auto‑aleatorio configurable."/>
-  <meta property="og:title" content="GLOBALTV4YOU — Mi TV Station"/>
-  <meta property="og:description" content="Cargador M3U/M3U8, favoritos, playlists, categorías y auto‑aleatorio con temporizador."/>
-  <meta property="og:type" content="website"/>
-  <meta property="og:image" content="https://tusitio.com/logo-globaltv4you.png"/>
-  ```
-
----
-
-## 📦 Publicar en GitHub Pages
-
-1. Crea un repo y sube `index.html` y tus assets (logo, etc.).
-2. *Settings → Pages* → **Deploy from a branch** → selecciona rama y carpeta raíz.
-3. Abre la URL publicada.
-
----
 
 ## 🗺️ Roadmap sugerido
 
@@ -172,6 +134,4 @@ Create Your IPTV M3U,JSON,M3U8  PLAYLIST EASY ALL IN ONE PLACE EXPORT AND IMPORT
 
 ---
 
-## 📄 Licencia
 
-MIT (puedes añadir tu archivo `LICENSE`).
