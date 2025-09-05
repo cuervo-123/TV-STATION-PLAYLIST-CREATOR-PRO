@@ -352,15 +352,15 @@
         const items = M3U.parse(text);
         if(!items.length) throw new Error('Lista vacía o formato no reconocido');
         playlist = dedupeByUrl(items);
-        // al importar reemplazas por completo; no hace falta preservar
-        populateDropdown();
+        // Importar: preservar scroll/selección y no auto-reproducir
+        populateDropdown({ preserveSelection:true, preserveScroll:true, autoplayIfEmpty:false });
       }catch(err){ console.error(err); alert('Error al cargar el playlist. Verifica el formato .m3u/.m3u8'); }
     };
     reader.readAsText(file);
   };
   fileInput.addEventListener('change', fileInputHandler);
 
-  // ===== Filtro que preserva scroll =====
+  // ===== Filtro que preserva scroll (doble restauración) =====
   document.getElementById('searchBox').addEventListener('input', (e)=>{
     const term = e.target.value.toLowerCase();
     const st = dropdown.scrollTop;
@@ -368,6 +368,7 @@
       opt.style.display = opt.text.toLowerCase().includes(term) ? '' : 'none';
     }
     dropdown.scrollTop = st;
+    requestAnimationFrame(()=>{ dropdown.scrollTop = st; });
   });
 
   // Botones inferiores
@@ -388,22 +389,30 @@
     const pick = pickRandomFromSelection() || dropdown.value;
     if(pick) playStream(pick);
   });
-  // Preferencia "Clic reproduce"
   const clickPlayChk = document.getElementById('chkClickPlay');
   clickPlayChk.checked = localStorage.getItem('clickPlay') === 'true';
   clickPlayChk.addEventListener('change', ()=> localStorage.setItem('clickPlay', String(clickPlayChk.checked)));
 
-  // ===== Clic sin teclas que NO resetea el scroll =====
-  dropdown.addEventListener('mousedown', (e)=>{
+  // ===== CLICK: handler con pointerdown + triple restauración de scroll =====
+  dropdown.addEventListener('pointerdown', (e) => {
     const opt = e.target;
-    if(opt && opt.tagName === 'OPTION'){
-      const st = dropdown.scrollTop;
-      e.preventDefault();
-      opt.selected = !opt.selected;      // toggle sin Cmd/Ctrl
-      dropdown.scrollTop = st;           // restaurar scroll
-      dropdown.dispatchEvent(new Event('change', {bubbles:true}));
-      if(clickPlayChk?.checked){ playStream(opt.value); }
-    }
+    if (!opt || opt.tagName !== 'OPTION') return;
+
+    const st = dropdown.scrollTop;
+    e.preventDefault();            // evita comportamiento nativo
+    opt.selected = !opt.selected;  // toggle sin teclas
+
+    // restaurar scroll inmediatamente…
+    dropdown.scrollTop = st;
+    // …en el próximo frame…
+    requestAnimationFrame(() => {
+      dropdown.scrollTop = st;
+      // …y en micro-delay (Safari/TV webviews)
+      setTimeout(() => { dropdown.scrollTop = st; }, 0);
+    });
+
+    dropdown.dispatchEvent(new Event('change', { bubbles: true }));
+    if (clickPlayChk?.checked) playStream(opt.value);
   });
 
   // Doble clic / Enter / atajos
@@ -430,8 +439,20 @@
     loadAllPlaylists();
     alert('Playlist guardada.');
   }
-  function loadSavedPlaylist(name){ if(!name) return; const saved = localStorage.getItem(`playlist_${name}`); if(saved){ playlist = M3U.parse(saved); populateDropdown(); } }
-  function deleteSelectedPlaylist(){ const name = savedPlaylistsDropdown.value; if(!name) return alert('Selecciona una playlist guardada'); localStorage.removeItem(`playlist_${name}`); loadAllPlaylists(); }
+  function loadSavedPlaylist(name){
+    if(!name) return;
+    const saved = localStorage.getItem(`playlist_${name}`);
+    if(saved){
+      playlist = M3U.parse(saved);
+      populateDropdown({ preserveSelection:true, preserveScroll:true, autoplayIfEmpty:false });
+    }
+  }
+  function deleteSelectedPlaylist(){
+    const name = savedPlaylistsDropdown.value;
+    if(!name) return alert('Selecciona una playlist guardada');
+    localStorage.removeItem(`playlist_${name}`);
+    loadAllPlaylists();
+  }
   function loadAllPlaylists(){
     savedPlaylistsDropdown.innerHTML = '<option value="">Selecciona una lista...</option>';
     for(const key of Object.keys(localStorage)){
@@ -520,7 +541,7 @@
   }
 
   // ========= Auto-carga de listas internas =========
-  const INTERNAL_FILES = ['update2.m3u','xumo.m3u','xiaomi.m3u']; // ajusta rutas si van a una carpeta
+  const INTERNAL_FILES = ['update2.m3u','xumo.m3u','xiaomi.m3u'];
 
   function setInternalStatus(msg){
     const el = document.getElementById('internalStatus');
@@ -564,7 +585,7 @@
     const finalList = dedupeByUrl(all);
     playlist = merge ? dedupeByUrl([...(playlist||[]), ...finalList]) : finalList;
 
-    // ⬇️ preserva selección y scroll al refrescar
+    // preserva selección y scroll al refrescar; no auto-play
     populateDropdown({ preserveSelection: true, preserveScroll: true, autoplayIfEmpty: false });
 
     setInternalStatus(ok ? `✅ ${finalList.length} canales (${ok}/${targets.length}) — ${notes.join(' · ')}` : '⚠️ No se pudo cargar (revisa nombres/rutas o abre por http://)');
@@ -573,7 +594,7 @@
   // ========= Inicio =========
   window.addEventListener('load', ()=>{
     playlist = [];
-    populateDropdown();
+    populateDropdown(); // carga inicial
     loadAllPlaylists();
     syncSeconds(60);
 
