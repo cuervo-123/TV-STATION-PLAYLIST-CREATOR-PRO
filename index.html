@@ -24,6 +24,7 @@
     .muted{color:var(--muted)}
     .row.gap8{gap:8px}
     .tag{display:inline-block;background:#1e2536;border:1px solid #2b3448;border-radius:999px;padding:4px 10px;font-size:12px;color:#b7c1cc}
+    .divider{height:1px;background:#222836;margin:8px 0}
   </style>
 </head>
 <body>
@@ -34,22 +35,28 @@
 
   <main>
     <div class="row">
+      <!-- Columna: Reproductor -->
       <div class="col panel">
         <h3>Reproductor</h3>
         <video id="videoPlayer" controls autoplay playsinline></video>
         <div class="row gap8" style="margin-top:10px">
           <button id="btnFav">⭐ Agregar a Favoritos</button>
-          <button id="btnAleatorio">▶️ Aleatorio inmediato</button>
+          <button id="btnAleatorio">▶️ Reproducir selección aleatoria</button>
           <button id="btnStop">⏹️ Stop</button>
         </div>
-        <div style="margin-top:10px">
-          <label>⏱️ Tiempo entre aleatorios (segundos): </label>
-          <input type="number" id="aleatorioTimerInput" value="60" min="5" style="width:80px" />
-          <button id="btnStartAuto">▶️ Iniciar Auto-Aleatorio</button>
-          <button id="btnStopAuto">⏹️ Detener Auto-Aleatorio</button>
+        <!-- Temporizador externo para modo Auto-Aleatorio -->
+        <div class="row" id="autoRandomControls" style="margin-top:10px; gap:8px; align-items:center;">
+          <span class="muted">⏱️ Temporizador (segundos):</span>
+          <input type="number" id="randSeconds" min="5" max="3600" step="5" value="60" style="width:110px"/>
+          <input type="range" id="randRange" min="5" max="1800" step="5" value="60" style="flex:1"/>
+          <button id="btnStartAuto">🔁 Iniciar Auto</button>
+          <button id="btnPauseAuto">⏸️ Pausa/Continuar</button>
+          <button id="btnStopAuto">⏹️ Detener Auto</button>
         </div>
+        <div class="muted" id="countdownLabel" style="margin-top:4px">Próximo cambio en —</div>
       </div>
 
+      <!-- Columna: Canales -->
       <div class="col panel">
         <h3>Canales</h3>
         <input id="searchBox" placeholder="Buscar por nombre o categoría..." style="width:100%;margin-bottom:8px"/>
@@ -59,132 +66,429 @@
           <button id="btnExportSel">⬇️ Exportar selección (.m3u)</button>
         </div>
         <div class="muted" style="margin-top:6px"><span id="countLabel">0</span> canales cargados</div>
-<!-- Auto-carga de listas internas -->
-<div class="row gap8" style="margin-top:8px; align-items:center">
-  <label class="muted" for="internalListSelect">Lista interna:</label>
-  <select id="internalListSelect" style="flex:1; min-width:180px">
-    <option value="all" selected>Todas (combinar)</option>
-    <option value="update2.m3u">update2.m3u</option>
-    <option value="xumo.m3u">xumo.m3u</option>
-    <option value="xiaomi.m3u">xiaomi.m3u</option>
-  </select>
-  <label class="muted" style="display:flex; align-items:center; gap:6px;">
-    <input type="checkbox" id="internalMerge" checked/> Fusionar con lista actual
-  </label>
-  <button id="btnLoadInternal">📥 Cargar</button>
-  <span class="muted" id="internalStatus">—</span>
-</div>
 
-<!-- Panel avanzado (ocultable) para seleccionar múltiples listas internas -->
-<div class="row" style="margin-top:8px; flex-direction:column; gap:8px;">
-  <div class="row gap8" style="align-items:center;">
-    <button id="toggleInternalBox">🧩 Listas internas (mostrar/ocultar)</button>
-    <span class="muted">Opcional: seleccionar varias listas específicas</span>
-  </div>
-  <div id="internalBox" style="display:none; border:1px dashed #2a3142; border-radius:10px; padding:8px;">
-    <div class="row gap8" style="align-items:center;">
-      <select id="internalListMulti" multiple size="4" style="flex:1; min-width:240px">
-        <option value="update2.m3u">update2.m3u</option>
-        <option value="xumo.m3u">xumo.m3u</option>
-        <option value="xiaomi.m3u">xiaomi.m3u</option>
-      </select>
-      <div class="row gap8" style="flex-wrap:wrap;">
-        <button id="btnSelAllInternal">Seleccionar todo</button>
-        <button id="btnClearInternal">Limpiar selección</button>
-        <button id="btnLoadInternalSel">📥 Cargar seleccionadas</button>
+        <div class="divider"></div>
+        <!-- Auto-carga de listas internas -->
+        <div class="row gap8" style="margin-top:8px; align-items:center">
+          <label class="muted" for="internalListSelect">Lista interna:</label>
+          <select id="internalListSelect" style="flex:1; min-width:180px">
+            <option value="all" selected>Todas (combinar)</option>
+            <option value="update2.m3u">update2.m3u</option>
+            <option value="xumo.m3u">xumo.m3u</option>
+            <option value="xiaomi.m3u">xiaomi.m3u</option>
+          </select>
+          <label class="muted" style="display:flex; align-items:center; gap:6px;">
+            <input type="checkbox" id="internalMerge" checked/> Fusionar con lista actual
+          </label>
+          <button id="btnLoadInternal">📥 Cargar</button>
+          <span class="muted" id="internalStatus">—</span>
+        </div>
+
+        <!-- Panel avanzado (ocultable) para seleccionar múltiples listas internas -->
+        <div class="row" style="margin-top:8px; flex-direction:column; gap:8px;">
+          <div class="row gap8" style="align-items:center;">
+            <button id="toggleInternalBox">🧩 Listas internas (mostrar/ocultar)</button>
+            <span class="muted">Opcional: seleccionar varias listas específicas</span>
+          </div>
+          <div id="internalBox" style="display:none; border:1px dashed #2a3142; border-radius:10px; padding:8px;">
+            <div class="row gap8" style="align-items:center;">
+              <select id="internalListMulti" multiple size="4" style="flex:1; min-width:240px">
+                <option value="update2.m3u">update2.m3u</option>
+                <option value="xumo.m3u">xumo.m3u</option>
+                <option value="xiaomi.m3u">xiaomi.m3u</option>
+              </select>
+              <div class="row gap8" style="flex-wrap:wrap;">
+                <button id="btnSelAllInternal">Seleccionar todo</button>
+                <button id="btnClearInternal">Limpiar selección</button>
+                <button id="btnLoadInternalSel">📥 Cargar seleccionadas</button>
+              </div>
+            </div>
+            <div class="muted" style="font-size:12px;">Usa el checkbox "Fusionar con lista actual" si no quieres reemplazar lo que ya está cargado.</div>
+          </div>
+        </div>
       </div>
     </div>
-    <div class="muted" style="font-size:12px;">Usa el checkbox "Fusionar con lista actual" si no quieres reemplazar lo que ya está cargado.</div>
-  </div>
-</div>
+
+    <!-- Favoritos & Categorías -->
+    <div class="row" style="margin-top:16px">
+      <div class="col panel">
+        <h3>Importar / Guardar Playlists</h3>
+        <input type="file" accept=".m3u,.m3u8" id="playlistFile" />
+        <div class="row gap8" style="margin-top:10px">
+          <input id="playlistName" placeholder="Nombre de la playlist" style="flex:1"/>
+          <button id="btnGuardarPL">💾 Guardar selección</button>
+        </div>
+        <div class="row gap8" style="margin-top:10px">
+          <select id="savedPlaylists" style="flex:1">
+            <option value="">Selecciona una lista...</option>
+          </select>
+          <button id="btnLoadPL">📂 Cargar</button>
+          <button id="btnDeletePL">🗑️ Eliminar</button>
+          <button id="btnExportPL">⬇️ Exportar (.m3u)</button>
+        </div>
+      </div>
+
+      <div class="col panel">
+        <h3>⭐ Favoritos</h3>
+        <select id="favoritosDropdown" multiple size="8" style="width:100%"></select>
+        <div class="row gap8" style="margin-top:8px">
+          <button id="btnPlayFav">📺 Reproducir</button>
+          <button id="btnDelFav">❌ Eliminar</button>
+          <button id="btnExportFav">⬇️ Exportar (.m3u)</button>
+        </div>
+
+        <h3 style="margin-top:16px">Categorías</h3>
+        <div class="row gap8">
+          <select id="categoryDropdown" style="flex:1">
+            <option value="">Selecciona una categoría...</option>
+          </select>
+          <button id="btnNewCat">📝 Crear</button>
+          <button id="btnAddToCat">🔀 Añadir selección</button>
+        </div>
+        <h4 style="margin:12px 0 6px">Canales de esta Categoría</h4>
+        <ul id="categoryChannelsList"></ul>
       </div>
     </div>
 
-    <!-- Resto igual que antes (playlists, favoritos, categorías, editor) -->
-    <!-- ... -->
+    <div class="panel" style="margin-top:16px">
+      <h3>Editor (placeholder)</h3>
+      <button id="toggleEditorBtn">🎛️ Mostrar/ocultar editor</button>
+      <div id="channelEditor" style="display:none; margin-top:10px" class="muted">Aquí puedes construir tu editor visual más adelante.</div>
+    </div>
   </main>
 
   <script>
-  /* ================== Auto-carga de listas internas (3 samples) ==================
-     Cambia estos nombres/rutas cuando subas tus archivos .m3u a GitHub. Puedes usar
-     rutas relativas (por ejemplo dentro de una carpeta /lists del repo) o URLs absolutas. */
-  const INTERNAL_PLAYLISTS = [
-    'update2.m3u',
-    'xumo.m3u',
-    'xiaomi.m3u'
-  ];
+  // ========= Utilidades M3U / JSON =========
+  const M3U = {
+    parse(text){
+      if(!text || !text.trim()) return [];
+      const t = text.trim();
+      if(t.startsWith('[') || t.startsWith('{')){
+        try{
+          const data = JSON.parse(t);
+          if(Array.isArray(data)) return data.filter(x => x && x.url && x.name);
+          if(data && Array.isArray(data.items)) return data.items.filter(x => x && x.url && x.name);
+        }catch(e){}
+      }
+      const lines = t.split(/\r?\n/).map(l => l.trim());
+      const out = [];
+      let meta = null;
+      for(let i=0;i<lines.length;i++){
+        const line = lines[i];
+        if(!line || line.startsWith('#EXTM3U')) continue;
+        if(line.startsWith('#EXTINF')){
+          const name = (line.split(',')[1] || '').trim();
+          const logoMatch = line.match(/tvg-logo="([^"]+)"/i);
+          const groupMatch = line.match(/group-title="([^"]+)"/i);
+          meta = { name: name || 'Canal', logo: logoMatch?logoMatch[1]:undefined, group: groupMatch?groupMatch[1]:undefined };
+        } else if(!line.startsWith('#')){
+          if(meta){ out.push({ name: meta.name, url: line, logo: meta.logo, group: meta.group }); meta = null; }
+          else { out.push({ name: 'Canal', url: line }); }
+        }
+      }
+      return out;
+    },
+    stringify(arr){ try{ return JSON.stringify(arr || []); }catch(e){ return '[]'; } },
+    toM3U(arr){
+      let out = ['#EXTM3U'];
+      (arr||[]).forEach(ch => {
+        const g = ch.group ? ` group-title="${escapeAttr(ch.group)}"` : '';
+        const l = ch.logo ? ` tvg-logo="${escapeAttr(ch.logo)}"` : '';
+        const name = ch.name || 'Canal';
+        out.push(`#EXTINF:-1${l}${g},${name}`);
+        out.push(ch.url);
+      });
+      return out.join('\n');
+    }
+  };
+  function escapeAttr(s){ return (s||'').replace(/"/g,'\\"'); }
 
-  // Elements helpers (evita conflictos si luego cambias IDs)
-  function getDD(){ return document.getElementById('channelDropdown'); }
-  function getVideo(){ return document.getElementById('videoPlayer'); }
-  function getCount(){ return document.getElementById('countLabel'); }
-  function setInternalStatus(msg){ const el = document.getElementById('internalStatus'); if(el) el.textContent = msg; }
+  // ========= Estado principal =========
+  let playlist = [];
+  let currentStream = null;
+  const video = document.getElementById('videoPlayer');
+  const dropdown = document.getElementById('channelDropdown');
+  const favoritosDropdown = document.getElementById('favoritosDropdown');
+  const savedPlaylistsDropdown = document.getElementById('savedPlaylists');
+  const categoryDropdown = document.getElementById('categoryDropdown');
+  const fileInput = document.getElementById('playlistFile');
+  const categoryChannelsList = document.getElementById('categoryChannelsList');
+  const countLabel = document.getElementById('countLabel');
 
-  // Parser sencillo M3U (si no existe ya uno más avanzado en tu app)
-  if (typeof window.M3U === 'undefined') {
-    window.M3U = {
-      parse(text){
-        const clean = (text||'').replace(/^﻿/, '').replace(/
-?/g,'
-');
-        const lines = clean.split('
-');
-        const out = [];
-        let nameTmp = null;
-        for (let i=0;i<lines.length;i++){
-          const line = lines[i].trim();
-          if(!line || line.startsWith('#EXTM3U')) continue;
-          if(line.startsWith('#EXTINF')){
-            const comma = line.indexOf(',');
-            nameTmp = (comma>-1 ? line.slice(comma+1).trim() : 'Canal');
-            continue;
-          }
-          if(/^https?:\/\//i.test(line)){
-            out.push({ name: nameTmp || 'Canal', url: line });
-            nameTmp = null;
+  // ========= Reproducción (HLS.js) =========
+  let hlsInstance = null;
+  function playStream(url){
+    if(!url) return;
+    if(hlsInstance){ try{ hlsInstance.destroy(); }catch(e){} hlsInstance = null; }
+
+    const isHLS = /\.m3u8(\?|$)/i.test(url) || url.includes('.m3u8');
+    if(isHLS && Hls.isSupported()){
+      hlsInstance = new Hls({ enableWorker:true, lowLatencyMode:true });
+      hlsInstance.loadSource(url);
+      hlsInstance.attachMedia(video);
+      hlsInstance.on(Hls.Events.MANIFEST_PARSED,()=>{ video.play().catch(()=>{}); });
+      hlsInstance.on(Hls.Events.ERROR,(evt,data)=>{
+        if(data && data.fatal){
+          switch(data.type){
+            case Hls.ErrorTypes.NETWORK_ERROR: hlsInstance.startLoad(); break;
+            case Hls.ErrorTypes.MEDIA_ERROR: hlsInstance.recoverMediaError(); break;
+            default: try{ hlsInstance.destroy(); }catch(e){}
           }
         }
-        return out;
+      });
+    } else {
+      video.src = url;
+      video.play().catch(()=>{});
+    }
+    currentStream = url;
+  }
+
+  // ========= Lista =========
+  function populateDropdown(){
+    dropdown.innerHTML = '';
+    (playlist||[]).forEach(ch => {
+      const opt = document.createElement('option');
+      opt.value = ch.url; opt.text = ch.name + (ch.group?` — ${ch.group}`:'');
+      dropdown.appendChild(opt);
+    });
+    countLabel.textContent = String(playlist.length);
+    if(playlist.length){ dropdown.selectedIndex = 0; playStream(playlist[0].url); }
+  }
+
+  // ========= Temporizador Auto-Aleatorio =========
+  const autoRandom = { running:false, tick:null, seconds:60, remaining:0 };
+  const randSecondsInput = document.getElementById('randSeconds');
+  const randRangeInput = document.getElementById('randRange');
+  const countdownLabel = document.getElementById('countdownLabel');
+
+  function syncSeconds(val){
+    const n = Math.max(5, Math.min(3600, parseInt(val||60,10)));
+    if(randSecondsInput) randSecondsInput.value = n;
+    if(randRangeInput) randRangeInput.value = Math.min(n, parseInt(randRangeInput.max||1800,10));
+    autoRandom.seconds = n;
+    if(!autoRandom.running) updateCountdownDisplay('—');
+  }
+  if(randSecondsInput) randSecondsInput.addEventListener('input', e => syncSeconds(e.target.value));
+  if(randRangeInput) randRangeInput.addEventListener('input', e => syncSeconds(e.target.value));
+
+  function updateCountdownDisplay(v){ if(countdownLabel) countdownLabel.textContent = `Próximo cambio en ${v}`; }
+  function pickRandomFromSelection(){
+    const selectedOptions = Array.from(dropdown.selectedOptions);
+    if(selectedOptions.length===0){ alert('Selecciona uno o más canales en la lista.'); return null; }
+    return selectedOptions[Math.floor(Math.random()*selectedOptions.length)].value;
+  }
+  function startAutoRandom(){
+    if(autoRandom.tick) clearInterval(autoRandom.tick);
+    const sel = Array.from(dropdown.selectedOptions);
+    if(sel.length===0) { alert('Selecciona uno o más canales para el modo Auto.'); return; }
+    autoRandom.running = true;
+    autoRandom.remaining = autoRandom.seconds;
+    const first = pickRandomFromSelection();
+    if(first) playStream(first);
+     autoRandom.tick = setInterval(()=>{
+      autoRandom.remaining -= 1;
+      if(autoRandom.remaining <= 0){
+        const next = pickRandomFromSelection();
+        if(next) playStream(next);
+        autoRandom.remaining = autoRandom.seconds;
       }
+      updateCountdownDisplay(`${autoRandom.remaining}s`);
+    }, 1000);
+  }
+  function pauseAutoRandom(){
+    if(!autoRandom.running) return;
+    autoRandom.running = false;
+    if(autoRandom.tick) { clearInterval(autoRandom.tick); autoRandom.tick = null; }
+    updateCountdownDisplay('pausado');
+  }
+  function resumeAutoRandom(){
+    if(autoRandom.running) return;
+    if(autoRandom.remaining<=0) autoRandom.remaining = autoRandom.seconds;
+    autoRandom.running = true;
+    if(autoRandom.tick) clearInterval(autoRandom.tick);
+    autoRandom.tick = setInterval(()=>{
+      autoRandom.remaining -= 1;
+      if(autoRandom.remaining <= 0){
+        const next = pickRandomFromSelection();
+        if(next) playStream(next);
+        autoRandom.remaining = autoRandom.seconds;
+      }
+      updateCountdownDisplay(`${autoRandom.remaining}s`);
+    },1000);
+  }
+  function stopAutoRandom(){
+    autoRandom.running = false;
+    if(autoRandom.tick) { clearInterval(autoRandom.tick); autoRandom.tick = null; }
+    autoRandom.remaining = 0;
+    updateCountdownDisplay('—');
+  }
+
+  // ========= Handlers básicos =========
+  const btnStartAuto = document.getElementById('btnStartAuto');
+  const btnPauseAuto = document.getElementById('btnPauseAuto');
+  const btnStopAuto = document.getElementById('btnStopAuto');
+  if(btnStartAuto) btnStartAuto.addEventListener('click', ()=>{ syncSeconds(randSecondsInput.value); startAutoRandom(); });
+  if(btnPauseAuto) btnPauseAuto.addEventListener('click', ()=>{ if(autoRandom.running) pauseAutoRandom(); else resumeAutoRandom(); });
+  if(btnStopAuto) btnStopAuto.addEventListener('click', stopAutoRandom);
+
+  document.getElementById('searchBox').addEventListener('input', (e)=>{
+    const term = e.target.value.toLowerCase();
+    for(const opt of dropdown.options){ opt.style.display = opt.text.toLowerCase().includes(term) ? '' : 'none'; }
+  });
+
+  document.getElementById('btnPlay').addEventListener('click', ()=>{
+    const sel = dropdown.value; if(!sel) return alert('Selecciona un canal.');
+    playStream(sel);
+  });
+  document.getElementById('btnAleatorio').addEventListener('click', ()=>{
+    const pick = pickRandomFromSelection(); if(pick) playStream(pick);
+  });
+  document.getElementById('btnStop').addEventListener('click', ()=>{ video.pause(); });
+
+  // ========= File input manual =========
+  fileInput.addEventListener('change', (evt)=>{
+    const file = evt.target.files && evt.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      try{
+        const text = e.target.result;
+        const items = M3U.parse(text);
+        if(!items.length) throw new Error('Lista vacía o formato no reconocido');
+        playlist = dedupeByUrl(items);
+        populateDropdown();
+      }catch(err){ console.error(err); alert('Error al cargar el playlist. Verifica el formato .m3u/.m3u8'); }
     };
+    reader.readAsText(file);
+  });
+
+  // ========= Favoritos =========
+  function agregarAFavoritos(){
+    if(!currentStream) return alert('No hay canal reproduciéndose.');
+    const canal = (playlist||[]).find(c => c.url===currentStream);
+    const name = canal ? canal.name : (prompt('Nombre para el favorito:')||'Canal');
+    let favs = M3U.parse(localStorage.getItem('favoritos')||'[]');
+    if(!favs.find(f => f.url===currentStream)) favs.push({ name, url: currentStream });
+    localStorage.setItem('favoritos', M3U.stringify(favs));
+    loadFavoritos();
   }
-
-  // Estado mínimo global compatible
-  if (typeof window.playlist === 'undefined') window.playlist = [];
-  if (typeof window.hlsInstance === 'undefined') window.hlsInstance = null;
-
-  // Dedupe por URL
-  function dedupeByUrl(arr){ const seen=new Set(); const out=[]; for(const x of (arr||[])){ if(x && x.url && !seen.has(x.url)){ seen.add(x.url); out.push(x);} } return out; }
-
-  // Render de la lista (si no existe uno propio llamado populateDropdown)
-  function renderDropdownFrom(list){
-    const dd = getDD(); if(!dd) return;
-    dd.innerHTML = '';
-    (list||[]).forEach(ch => { const o=document.createElement('option'); o.value=ch.url; o.text=ch.name||'Canal'; dd.appendChild(o); });
-    const c = getCount(); if(c) c.textContent = String(list?.length||0);
-    if(list && list.length){ playStream(list[0].url); dd.selectedIndex = 0; }
+  function loadFavoritos(){
+    favoritosDropdown.innerHTML='';
+    const favs = M3U.parse(localStorage.getItem('favoritos')||'[]');
+    for(const f of favs){ const o=document.createElement('option'); o.value=f.url; o.text=f.name; favoritosDropdown.appendChild(o); }
   }
+  function reproducirFavorito(){ const url = favoritosDropdown.value; if(!url) return alert('Selecciona un canal favorito'); playStream(url); }
+  function eliminarFavorito(){ const url = favoritosDropdown.value; if(!url) return; let favs = M3U.parse(localStorage.getItem('favoritos')||'[]'); favs = favs.filter(f=>f.url!==url); localStorage.setItem('favoritos', M3U.stringify(favs)); loadFavoritos(); }
+  function exportarFavoritos(){ const favs = M3U.parse(localStorage.getItem('favoritos')||'[]'); if(!favs.length) return alert('No hay favoritos.'); downloadText(M3U.toM3U(favs), 'favoritos.m3u'); }
 
-  // Reproducción básica con HLS.js (solo si no existe ya playStream)
-  if (typeof window.playStream !== 'function') {
-    window.playStream = function(url){
-      if(!url) return;
-      const video = getVideo(); if(!video) return;
-      if(window.hlsInstance){ try{ window.hlsInstance.destroy(); }catch(e){} window.hlsInstance = null; }
-      const isHLS = /\.m3u8(\?|$)/i.test(url) || url.includes('.m3u8');
-      if(isHLS && window.Hls && Hls.isSupported()){
-        window.hlsInstance = new Hls({ enableWorker:true, lowLatencyMode:true });
-        window.hlsInstance.loadSource(url);
-        window.hlsInstance.attachMedia(video);
-        window.hlsInstance.on(Hls.Events.MANIFEST_PARSED,()=>{ video.play().catch(()=>{}); });
-        window.hlsInstance.on(Hls.Events.ERROR,(evt,data)=>{ if(data && data.fatal){ try{ window.hlsInstance.destroy(); }catch(e){} } });
-      } else {
-        video.src = url; video.play().catch(()=>{});
+  document.getElementById('btnFav').addEventListener('click', agregarAFavoritos);
+  document.getElementById('btnPlayFav').addEventListener('click', reproducirFavorito);
+  document.getElementById('btnDelFav').addEventListener('click', eliminarFavorito);
+  document.getElementById('btnExportFav').addEventListener('click', exportarFavoritos);
+
+  // ========= Categorías =========
+  function createCategory(){
+    const name = (prompt('Nombre de la nueva categoría:')||'').trim();
+    if(!name) return;
+    const key = `cat_${name}`;
+    if(!localStorage.getItem(key)){
+      localStorage.setItem(key, M3U.stringify([]));
+      loadAllCategories();
+      alert('Categoría creada.');
+    } else { alert('Ya existe una categoría con ese nombre.'); }
+  }
+  function loadAllCategories(){
+    categoryDropdown.innerHTML = '<option value="">Selecciona una categoría...</option>';
+    for(const key of Object.keys(localStorage)){
+      if(key.startsWith('cat_')){
+        const name = key.replace('cat_','');
+        const opt = document.createElement('option'); opt.value=name; opt.text=name; categoryDropdown.appendChild(opt);
       }
+    }
+    // refrescar listado si hay categoría seleccionada
+    loadCategoryChannels();
+  }
+  function addToCategory(){
+    const cat = categoryDropdown.value; if(!cat) return alert('Selecciona una categoría primero');
+    const selected = Array.from(dropdown.selectedOptions).map(opt => ({ name: opt.text, url: opt.value }));
+    if(!selected.length) return alert('Selecciona al menos un canal');
+    let data = M3U.parse(localStorage.getItem(`cat_${cat}`)||'[]');
+    for(const c of selected){ if(!data.find(d=>d.url===c.url)) data.push(c); }
+    localStorage.setItem(`cat_${cat}`, M3U.stringify(data));
+    loadCategoryChannels();
+    alert('Canales añadidos a la categoría');
+  }
+  function loadCategoryChannels(){
+    const cat = categoryDropdown.value; categoryChannelsList.innerHTML='';
+    if(!cat) return;
+    const channels = M3U.parse(localStorage.getItem(`cat_${cat}`)||'[]');
+    for(const ch of channels){
+      const li=document.createElement('li'); li.textContent=ch.name; li.style.cursor='pointer';
+      li.onclick=()=> playStream(ch.url);
+      categoryChannelsList.appendChild(li);
     }
   }
 
-  // Fetch seguro de texto
+  document.getElementById('btnNewCat').addEventListener('click', createCategory);
+  document.getElementById('btnAddToCat').addEventListener('click', addToCategory);
+  categoryDropdown.addEventListener('change', loadCategoryChannels);
+
+  // ========= Playlists localStorage =========
+  function savePlaylist(){
+    const name = (document.getElementById('playlistName').value||'').trim();
+    if(!name) return alert('Escribe un nombre para la playlist');
+    const selected = Array.from(dropdown.selectedOptions).map(opt => ({ name: opt.text, url: opt.value }));
+    if(!selected.length) return alert('Selecciona al menos un canal');
+    localStorage.setItem(`playlist_${name}`, M3U.stringify(selected));
+    loadAllPlaylists();
+    alert('Playlist guardada.');
+  }
+  function loadSavedPlaylist(name){ if(!name) return; const saved = localStorage.getItem(`playlist_${name}`); if(saved){ playlist = M3U.parse(saved); populateDropdown(); } }
+  function deleteSelectedPlaylist(){ const name = savedPlaylistsDropdown.value; if(!name) return alert('Selecciona una playlist guardada'); localStorage.removeItem(`playlist_${name}`); loadAllPlaylists(); }
+  function loadAllPlaylists(){
+    savedPlaylistsDropdown.innerHTML = '<option value="">Selecciona una lista...</option>';
+    for(const key of Object.keys(localStorage)){
+      if(key.startsWith('playlist_')){
+        const name = key.replace('playlist_','');
+        const opt = document.createElement('option');
+        opt.value = name; opt.text = name; savedPlaylistsDropdown.appendChild(opt);
+      }
+    }
+    loadFavoritos();
+    loadAllCategories();
+  }
+
+  document.getElementById('btnGuardarPL').addEventListener('click', savePlaylist);
+  document.getElementById('btnLoadPL').addEventListener('click', ()=>{ loadSavedPlaylist(savedPlaylistsDropdown.value); });
+  document.getElementById('btnDeletePL').addEventListener('click', deleteSelectedPlaylist);
+  document.getElementById('btnExportPL').addEventListener('click', ()=>{
+    const name = savedPlaylistsDropdown.value || 'playlist';
+    const text = M3U.toM3U(playlist);
+    downloadText(text, `${name}.m3u`);
+  });
+
+  // ========= Exportaciones =========
+  function exportSelectionM3U(){
+    const selected = Array.from(dropdown.selectedOptions).map(opt => ({ name: opt.text, url: opt.value }));
+    if(!selected.length) return alert('Selecciona uno o más canales.');
+    const text = M3U.toM3U(selected);
+    downloadText(text, 'seleccion.m3u');
+  }
+  document.getElementById('btnExportSel').addEventListener('click', exportSelectionM3U);
+
+  function downloadText(text, filename){
+    const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+  }
+
+  // ========= Auto-carga de listas internas =========
+  const INTERNAL_PLAYLISTS = [ 'update2.m3u', 'xumo.m3u', 'xiaomi.m3u' ];
+  function setInternalStatus(msg){ const el = document.getElementById('internalStatus'); if(el) el.textContent = msg; }
+
   async function fetchTextSafe(path){
     const url = encodeURI(String(path||'').trim());
     try{
@@ -194,8 +498,8 @@
       return { ok:true, url, text:txt };
     }catch(err){ return { ok:false, url, error:String(err) }; }
   }
+  function dedupeByUrl(arr){ const seen=new Set(); const out=[]; for(const x of (arr||[])){ if(x && x.url && !seen.has(x.url)){ seen.add(x.url); out.push(x);} } return out; }
 
-  // Cargar TODAS las listas internas y combinarlas
   async function loadInternalPlaylists(which='all', merge=false){
     setInternalStatus('Cargando listas internas…');
     const targets = Array.isArray(which)
@@ -206,42 +510,31 @@
 
     const channels = [];
     let okCount = 0;
-    for(const r of results){
-      if(r.ok){ okCount++; try{ channels.push(...(M3U.parse(r.text)||[])); }catch(e){} }
+    const perListCounts = [];
+    for(let idx=0; idx<results.length; idx++){
+      const r = results[idx];
+      if(r.ok){
+        try{ const parsed = (M3U.parse(r.text)||[]); channels.push(...parsed); okCount++; perListCounts.push(`${targets[idx]}: ${parsed.length}`); }
+        catch(e){ perListCounts.push(`${targets[idx]}: error parse`); }
+      } else {
+        perListCounts.push(`${targets[idx]}: FAIL`);
+      }
     }
     const finalList = dedupeByUrl(channels);
 
-    if(merge){ window.playlist = dedupeByUrl([...(window.playlist||[]), ...finalList]); }
-    else { window.playlist = finalList; }
+    if(merge){ playlist = dedupeByUrl([...(playlist||[]), ...finalList]); }
+    else { playlist = finalList; }
 
-    if(typeof window.populateDropdown === 'function') window.populateDropdown(); else renderDropdownFrom(window.playlist);
-    setInternalStatus(okCount ? `✅ ${finalList.length} canales (${okCount}/${targets.length})` : '⚠️ No se pudo cargar (revisa rutas/CORS)');
-  }catch(e){} }
-    }
-    const finalList = dedupeByUrl(channels);
-
-    if(merge){ window.playlist = dedupeByUrl([...(window.playlist||[]), ...finalList]); }
-    else { window.playlist = finalList; }
-
-    if(typeof window.populateDropdown === 'function') window.populateDropdown(); else renderDropdownFrom(window.playlist);
-    setInternalStatus(okCount ? `✅ ${finalList.length} canales (${okCount}/${targets.length})` : '⚠️ No se pudo cargar (revisa rutas/CORS)');
-  }
-    }
-    const finalList = dedupeByUrl(channels);
-    if(merge){ window.playlist = dedupeByUrl([...(window.playlist||[]), ...finalList]); }
-    else { window.playlist = finalList; }
-
-    if(typeof window.populateDropdown === 'function') window.populateDropdown(); else renderDropdownFrom(window.playlist);
-    setInternalStatus(okCount ? `✅ ${finalList.length} canales` : '⚠️ No se pudo cargar (revisa rutas/CORS)');
+    populateDropdown();
+    setInternalStatus(okCount ? `✅ ${finalList.length} canales (${okCount}/${targets.length}) — ${perListCounts.join(' · ')}` : '⚠️ No se pudo cargar (revisa rutas/CORS)');
   }
 
-  // Botón y auto-carga al iniciar
   document.addEventListener('DOMContentLoaded', ()=>{
     const btn = document.getElementById('btnLoadInternal');
     const sel = document.getElementById('internalListSelect');
     const mergeCb = document.getElementById('internalMerge');
 
-    // Nuevo: controles avanzados (panel ocultable + multi-select)
+    // Panel avanzado (multi)
     const toggleBtn = document.getElementById('toggleInternalBox');
     const advBox   = document.getElementById('internalBox');
     const multiSel = document.getElementById('internalListMulti');
@@ -254,11 +547,9 @@
     if(sel) sel.value = lastWhich;
     if(mergeCb) mergeCb.checked = lastMerge;
 
-    // Restaurar estado de visibilidad del panel
     const boxOpen = localStorage.getItem('internalBoxOpen') === 'true';
     if(advBox) advBox.style.display = boxOpen ? 'block' : 'none';
 
-    // Botón carga de selección simple
     if(btn) btn.addEventListener('click', ()=>{
       const which = sel ? sel.value : 'all';
       const merge = !!(mergeCb && mergeCb.checked);
@@ -267,7 +558,6 @@
       loadInternalPlaylists(which, merge);
     });
 
-    // Toggle del panel avanzado
     if(toggleBtn) toggleBtn.addEventListener('click', ()=>{
       if(!advBox) return;
       const willShow = advBox.style.display !== 'block';
@@ -275,58 +565,33 @@
       localStorage.setItem('internalBoxOpen', String(willShow));
     });
 
-    // Seleccionar todo / limpiar multi-select
     function selectAll(el){ if(!el) return; Array.from(el.options).forEach(o => o.selected = true); }
     function clearAll(el){ if(!el) return; Array.from(el.options).forEach(o => o.selected = false); }
-
     if(btnAll) btnAll.addEventListener('click', ()=> selectAll(multiSel));
     if(btnClr) btnClr.addEventListener('click', ()=> clearAll(multiSel));
 
-    // Cargar seleccionadas del multi-select
     if(btnLoadS) btnLoadS.addEventListener('click', ()=>{
       const merge = !!(mergeCb && mergeCb.checked);
       const choices = multiSel ? Array.from(multiSel.selectedOptions).map(o=>o.value) : [];
       if(!choices.length) return alert('Selecciona al menos una lista en el panel avanzado.');
       loadInternalPlaylists(choices, merge);
-      // Guardar última elección como 'custom'
-      localStorage.setItem('lastInternalList', 'all'); // mantenemos 'all' por compatibilidad del select simple
+      localStorage.setItem('lastInternalList', 'all');
       localStorage.setItem('lastInternalMerge', String(merge));
+    });
+
+    // Inicialización UI varias
+    document.getElementById('btnExportSel').disabled = false;
+    document.getElementById('toggleEditorBtn').addEventListener('click', ()=>{
+      const box = document.getElementById('channelEditor');
+      box.style.display = (box.style.display==='none' || !box.style.display) ? 'block' : 'none';
     });
 
     // Auto-carga al abrir la app usando la última elección simple
     loadInternalPlaylists(lastWhich, lastMerge);
+
+    // Inicializar combos
+    loadAllPlaylists();
   });
-
-    // Auto-carga al abrir la app usando la última elección
-    loadInternalPlaylists(lastWhich, lastMerge);
-  });
-
-// ====== (todas las funciones previas M3U, reproducción, etc. se mantienen) ======
-
-  let autoRandomInterval = null;
-
-  document.getElementById('btnAleatorio').addEventListener('click', playRandomPreview);
-  document.getElementById('btnStartAuto').addEventListener('click', ()=>{
-    const seconds = parseInt(document.getElementById('aleatorioTimerInput').value,10);
-    if(isNaN(seconds) || seconds<5){ return alert('Pon un valor válido (>=5 segundos)'); }
-    clearInterval(autoRandomInterval);
-    autoRandomInterval = setInterval(playRandomPreview, seconds*1000);
-    alert('Auto-Aleatorio iniciado cada '+seconds+' segundos');
-  });
-  document.getElementById('btnStopAuto').addEventListener('click', ()=>{
-    clearInterval(autoRandomInterval);
-    autoRandomInterval=null;
-    alert('Auto-Aleatorio detenido');
-  });
-
-  function playRandomPreview(){
-    const dd = getDD();
-    if(!dd) return alert('No se encontró la lista de canales.');
-    const selectedOptions = Array.from(dd.selectedOptions);
-    if(selectedOptions.length===0) return alert('Selecciona uno o más canales en la lista.');
-    const pick = selectedOptions[Math.floor(Math.random()*selectedOptions.length)].value;
-    playStream(pick);
-  }
   </script>
 </body>
 </html>
