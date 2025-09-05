@@ -81,9 +81,9 @@
           <label class="muted" style="display:flex; align-items:center; gap:6px;">
             <input type="checkbox" id="internalMerge" checked/> Fusionar con lista actual
           </label>
-          <button id="btnLoadInternal">📥 Cargar<\/button>
-          <button id="btnForceReload">↻ Forzar recarga<\/button>
-          <button id="btnDiag">🧪 Diagnóstico<\/button>
+          <button type="button" id="btnLoadInternal">📥 Cargar<\/button>
+          <button type="button" id="btnForceReload">↻ Forzar recarga<\/button>
+          <button type="button" id="btnDiag">🧪 Diagnóstico<\/button>
           <span class="muted" id="internalStatus">—<\/span>
         </div>
 
@@ -631,6 +631,47 @@
     // Inicializar combos
     loadAllPlaylists();
   });
-  </script>
+  // ===== Safety binder: asegura que los botones de carga NO queden deshabilitados =====
+  document.addEventListener('DOMContentLoaded', function(){
+    try{
+      if (typeof ensureButtonsEnabled !== 'function') {
+        window.ensureButtonsEnabled = function(){
+          ['btnLoadInternal','btnForceReload','btnDiag'].forEach(function(id){
+            var el = document.getElementById(id);
+            if(!el) return;
+            el.disabled = false; el.removeAttribute('disabled'); el.setAttribute('aria-disabled','false');
+            el.style.pointerEvents = 'auto'; el.style.opacity='';
+          });
+        };
+      }
+      ensureButtonsEnabled();
+
+      var sel = document.getElementById('internalListSelect');
+      var mergeCb = document.getElementById('internalMerge');
+      var bindMap = {
+        btnLoadInternal: function(){
+          var which = sel ? sel.value : 'all';
+          var merge = !!(mergeCb && mergeCb.checked);
+          if (typeof loadInternalPlaylists === 'function') loadInternalPlaylists(which, merge);
+        },
+        btnForceReload: function(){
+          var which = sel ? sel.value : 'all';
+          var merge = !!(mergeCb && mergeCb.checked);
+          if (typeof loadInternalPlaylists === 'function') loadInternalPlaylists(which, merge);
+        },
+        btnDiag: function(){ if (typeof diagnoseInternal === 'function') diagnoseInternal(); }
+      };
+      Object.keys(bindMap).forEach(function(id){
+        var el = document.getElementById(id);
+        if(!el) return;
+        el.disabled = false; el.removeAttribute('disabled'); el.style.pointerEvents='auto';
+        if(!el.dataset._bound){
+          el.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); bindMap[id](); });
+          el.dataset._bound = '1';
+        }
+      });
+    } catch(err) { console.warn('Safety binder error:', err); }
+  });
+</script>
 </body>
 </html>
