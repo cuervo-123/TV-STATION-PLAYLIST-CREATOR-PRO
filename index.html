@@ -233,16 +233,37 @@
     currentStream = url;
   }
 
-  // ========= Lista =========
-  function populateDropdown(){
+  // ========= Lista (con preservación de selección/scroll) =========
+  function populateDropdown(opts = {}) {
+    const {
+      preserveSelection = false,
+      preserveScroll = false,
+      autoplayIfEmpty = true,
+    } = opts;
+
+    const prevSelected = preserveSelection
+      ? new Set(Array.from(dropdown.selectedOptions).map(o => o.value))
+      : null;
+    const prevScroll = preserveScroll ? dropdown.scrollTop : 0;
+
     dropdown.innerHTML = '';
-    (playlist||[]).forEach(ch => {
+    (playlist || []).forEach(ch => {
       const opt = document.createElement('option');
-      opt.value = ch.url; opt.text = ch.name + (ch.group?` — ${ch.group}`:'');
+      opt.value = ch.url;
+      opt.text = ch.name + (ch.group ? ` — ${ch.group}` : '');
+      if (prevSelected && prevSelected.has(opt.value)) opt.selected = true;
       dropdown.appendChild(opt);
     });
+
     countLabel.textContent = String(playlist.length);
-    if(playlist.length){ dropdown.selectedIndex = 0; playStream(playlist[0].url); }
+
+    const hadPrevSelection = prevSelected && prevSelected.size > 0;
+    if (playlist.length && !hadPrevSelection) {
+      dropdown.selectedIndex = 0;
+      if (autoplayIfEmpty) playStream(playlist[0].url);
+    }
+
+    if (preserveScroll) dropdown.scrollTop = prevScroll;
   }
 
   // ========= Temporizador Auto-Aleatorio =========
@@ -331,6 +352,7 @@
         const items = M3U.parse(text);
         if(!items.length) throw new Error('Lista vacía o formato no reconocido');
         playlist = dedupeByUrl(items);
+        // al importar reemplazas por completo; no hace falta preservar
         populateDropdown();
       }catch(err){ console.error(err); alert('Error al cargar el playlist. Verifica el formato .m3u/.m3u8'); }
     };
@@ -338,9 +360,14 @@
   };
   fileInput.addEventListener('change', fileInputHandler);
 
+  // ===== Filtro que preserva scroll =====
   document.getElementById('searchBox').addEventListener('input', (e)=>{
     const term = e.target.value.toLowerCase();
-    for(const opt of dropdown.options){ opt.style.display = opt.text.toLowerCase().includes(term) ? '' : 'none'; }
+    const st = dropdown.scrollTop;
+    for(const opt of dropdown.options){
+      opt.style.display = opt.text.toLowerCase().includes(term) ? '' : 'none';
+    }
+    dropdown.scrollTop = st;
   });
 
   // Botones inferiores
@@ -352,7 +379,7 @@
   document.getElementById('btnStop').addEventListener('click', ()=>{ video.pause(); });
   document.getElementById('btnFav').addEventListener('click', agregarAFavoritos);
 
-  // ===== NUEVO: controles rápidos arriba =====
+  // ===== Controles rápidos arriba =====
   document.getElementById('btnPlayTop').addEventListener('click', ()=>{
     const sel = dropdown.value; if(!sel) return alert('Selecciona un canal.');
     playStream(sel);
@@ -366,20 +393,20 @@
   clickPlayChk.checked = localStorage.getItem('clickPlay') === 'true';
   clickPlayChk.addEventListener('change', ()=> localStorage.setItem('clickPlay', String(clickPlayChk.checked)));
 
-  // ===== NUEVO: clic sin Cmd/Ctrl para (de)seleccionar y reproducir si está activo =====
+  // ===== Clic sin teclas que NO resetea el scroll =====
   dropdown.addEventListener('mousedown', (e)=>{
     const opt = e.target;
     if(opt && opt.tagName === 'OPTION'){
-      e.preventDefault(); // evita que el navegador maneje selección estándar
-      opt.selected = !opt.selected; // toggle sin teclas
-      // dispara un change “manual” por consistencia
+      const st = dropdown.scrollTop;
+      e.preventDefault();
+      opt.selected = !opt.selected;      // toggle sin Cmd/Ctrl
+      dropdown.scrollTop = st;           // restaurar scroll
       dropdown.dispatchEvent(new Event('change', {bubbles:true}));
-      // ¿Clic reproduce?
-      if(clickPlayChk.checked){ playStream(opt.value); }
+      if(clickPlayChk?.checked){ playStream(opt.value); }
     }
   });
 
-  // ===== NUEVO: atajos y doble-clip/Enter =====
+  // Doble clic / Enter / atajos
   dropdown.addEventListener('dblclick', ()=>{ const v = dropdown.value; if(v) playStream(v); });
   dropdown.addEventListener('keydown', (e)=>{
     const k = e.key.toLowerCase();
@@ -388,7 +415,7 @@
     else if(k === 'f'){ e.preventDefault(); agregarAFavoritos(); }
   });
 
-  // Si está en auto-aleatorio y cambias selección manual, resetea el contador
+  // Reset del contador en auto-aleatorio al cambiar selección
   dropdown.addEventListener('change', ()=>{ if(autoRandom.running){ autoRandom.remaining = autoRandom.seconds; updateCountdownDisplay(`${autoRandom.remaining}s`);} });
 
   function dedupeByUrl(arr){ const seen=new Set(); const out=[]; for(const x of arr){ if(x && x.url && !seen.has(x.url)){ seen.add(x.url); out.push(x); } } return out; }
@@ -536,7 +563,10 @@
 
     const finalList = dedupeByUrl(all);
     playlist = merge ? dedupeByUrl([...(playlist||[]), ...finalList]) : finalList;
-    populateDropdown();
+
+    // ⬇️ preserva selección y scroll al refrescar
+    populateDropdown({ preserveSelection: true, preserveScroll: true, autoplayIfEmpty: false });
+
     setInternalStatus(ok ? `✅ ${finalList.length} canales (${ok}/${targets.length}) — ${notes.join(' · ')}` : '⚠️ No se pudo cargar (revisa nombres/rutas o abre por http://)');
   }
 
