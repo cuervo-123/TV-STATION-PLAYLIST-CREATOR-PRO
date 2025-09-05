@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <base href="./">
   <title>Mi TV Station</title>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
   <style>
@@ -80,8 +81,10 @@
           <label class="muted" style="display:flex; align-items:center; gap:6px;">
             <input type="checkbox" id="internalMerge" checked/> Fusionar con lista actual
           </label>
-          <button id="btnLoadInternal">📥 Cargar</button>
-          <span class="muted" id="internalStatus">—</span>
+          <button id="btnLoadInternal">📥 Cargar<\/button>
+          <button id="btnForceReload">↻ Forzar recarga<\/button>
+          <button id="btnDiag">🧪 Diagnóstico<\/button>
+          <span class="muted" id="internalStatus">—<\/span>
         </div>
 
         <!-- Panel avanzado (ocultable) para seleccionar múltiples listas internas -->
@@ -96,7 +99,6 @@
                 <option value="update2.m3u">update2.m3u</option>
                 <option value="xumo.m3u">xumo.m3u</option>
                 <option value="xiaomi.m3u">xiaomi.m3u</option>
-                <option value="localnow.m3u">localnow.m3u</option>
               </select>
               <div class="row gap8" style="flex-wrap:wrap;">
                 <button id="btnSelAllInternal">Seleccionar todo</button>
@@ -487,13 +489,21 @@
   }
 
   // ========= Auto-carga de listas internas =========
-  const INTERNAL_PLAYLISTS = [ 'update2.m3u', 'xumo.m3u','localnow.m3u' 'xiaomi.m3u' ];
+  const INTERNAL_PLAYLISTS = [ 'update2.m3u', 'xumo.m3u', 'xiaomi.m3u' ];
   function setInternalStatus(msg){ const el = document.getElementById('internalStatus'); if(el) el.textContent = msg; }
 
   async function fetchTextSafe(path){
-    const url = encodeURI(String(path||'').trim());
     try{
-      const res = await fetch(url, { cache: 'no-store' });
+      const url = new URL(String(path||'').trim(), document.baseURI);
+      url.searchParams.set('_ts', Date.now().toString()); // cache-buster
+      const res = await fetch(url.toString(), { cache: 'no-store' });
+      if(!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      const txt = await res.text();
+      return { ok:true, url: url.toString(), text: txt, status: res.status };
+    }catch(err){
+      return { ok:false, url: String(path), error: String(err) };
+    }
+  });
       if(!res.ok) throw new Error(`${res.status} ${res.statusText}`);
       const txt = await res.text();
       return { ok:true, url, text:txt };
@@ -530,10 +540,30 @@
     setInternalStatus(okCount ? `✅ ${finalList.length} canales (${okCount}/${targets.length}) — ${perListCounts.join(' · ')}` : '⚠️ No se pudo cargar (revisa rutas/CORS)');
   }
 
+  async function diagnoseInternal(){
+    const targets = INTERNAL_PLAYLISTS.slice();
+    const lines = [];
+    for(const p of targets){
+      try{
+        const u = new URL(p, document.baseURI);
+        u.searchParams.set('_ts', Date.now().toString());
+        const r = await fetch(u.toString(), { cache: 'no-store' });
+        lines.push(`${u.pathname}: ${r.status} ${r.statusText}`);
+      }catch(e){
+        lines.push(`${p}: ERROR ${String(e)}`);
+      }
+    }
+    alert('Diagnóstico de listas:
+' + lines.join('
+'));
+  }
+
   document.addEventListener('DOMContentLoaded', ()=>{
     const btn = document.getElementById('btnLoadInternal');
     const sel = document.getElementById('internalListSelect');
     const mergeCb = document.getElementById('internalMerge');
+    const btnForce = document.getElementById('btnForceReload');
+    const btnDiag = document.getElementById('btnDiag');
 
     // Panel avanzado (multi)
     const toggleBtn = document.getElementById('toggleInternalBox');
@@ -558,6 +588,14 @@
       localStorage.setItem('lastInternalMerge', String(merge));
       loadInternalPlaylists(which, merge);
     });
+
+    if(btnForce) btnForce.addEventListener('click', ()=>{
+      const which = sel ? sel.value : 'all';
+      const merge = !!(mergeCb && mergeCb.checked);
+      loadInternalPlaylists(which, merge); // ya forza con cache-buster
+    });
+
+    if(btnDiag) btnDiag.addEventListener('click', diagnoseInternal);
 
     if(toggleBtn) toggleBtn.addEventListener('click', ()=>{
       if(!advBox) return;
