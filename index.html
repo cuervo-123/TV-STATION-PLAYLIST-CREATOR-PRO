@@ -24,6 +24,7 @@
     .muted{color:var(--muted)}
     .row.gap8{gap:8px}
     .tag{display:inline-block;background:#1e2536;border:1px solid #2b3448;border-radius:999px;padding:4px 10px;font-size:12px;color:#b7c1cc}
+    details summary{cursor:pointer}
   </style>
 </head>
 <body>
@@ -38,18 +39,18 @@
         <h3>Reproductor</h3>
         <video id="videoPlayer" controls autoplay playsinline></video>
         <div class="row gap8" style="margin-top:10px">
-          <button id="btnFav">⭐ Agregar a Favoritos</button>
-          <button id="btnAleatorio">▶️ Reproducir selección aleatoria</button>
-          <button id="btnStop">⏹️ Stop</button>
+          <button id="btnFav" type="button">⭐ Agregar a Favoritos</button>
+          <button id="btnAleatorio" type="button">▶️ Reproducir selección aleatoria</button>
+          <button id="btnStop" type="button">⏹️ Stop</button>
         </div>
         <!-- Temporizador externo para modo Auto-Aleatorio -->
         <div class="row" id="autoRandomControls" style="margin-top:10px; gap:8px; align-items:center;">
           <span class="muted">⏱️ Temporizador (segundos):</span>
           <input type="number" id="randSeconds" min="5" max="3600" step="5" value="60" style="width:110px"/>
           <input type="range" id="randRange" min="5" max="1800" step="5" value="60" style="flex:1"/>
-          <button id="btnStartAuto">🔁 Iniciar Auto</button>
-          <button id="btnPauseAuto">⏸️ Pausa/Continuar</button>
-          <button id="btnStopAuto">⏹️ Detener Auto</button>
+          <button id="btnStartAuto" type="button">🔁 Iniciar Auto</button>
+          <button id="btnPauseAuto" type="button">⏸️ Pausa/Continuar</button>
+          <button id="btnStopAuto" type="button">⏹️ Detener Auto</button>
         </div>
         <div class="muted" id="countdownLabel" style="margin-top:4px">Próximo cambio en —</div>
       </div>
@@ -59,10 +60,32 @@
         <input id="searchBox" placeholder="Buscar por nombre o categoría..." style="width:100%;margin-bottom:8px"/>
         <select id="channelDropdown" multiple size="12" style="width:100%"></select>
         <div class="row gap8" style="margin-top:8px">
-          <button id="btnPlay">📺 Reproducir seleccionado</button>
-          <button id="btnExportSel">⬇️ Exportar selección (.m3u)</button>
+          <button id="btnPlay" type="button">📺 Reproducir seleccionado</button>
+          <button id="btnExportSel" type="button">⬇️ Exportar selección (.m3u)</button>
         </div>
         <div class="muted" style="margin-top:6px"><span id="countLabel">0</span> canales cargados</div>
+
+        <!-- ===== NUEVO: Auto-carga de listas internas ===== -->
+        <div class="row gap8" style="margin-top:12px; align-items:center;">
+          <button id="btnLoadInternal" type="button">📥 Cargar internas</button>
+          <button id="btnForceInternal" type="button" title="Ignora caché">↻ Forzar</button>
+          <label class="muted" style="display:flex; align-items:center; gap:6px;">
+            <input type="checkbox" id="chkMergeInternal" checked> Fusionar con actual
+          </label>
+          <label class="muted" style="display:flex; align-items:center; gap:6px;">
+            <input type="checkbox" id="chkAutoInternal"> Auto-cargar al abrir
+          </label>
+        </div>
+        <details style="margin-top:6px">
+          <summary class="muted">Opciones (elegir listas)</summary>
+          <div class="row" style="gap:12px; margin-top:8px; flex-wrap:wrap;">
+            <label><input type="checkbox" class="internal-item" value="update2.m3u" checked> update2.m3u</label>
+            <label><input type="checkbox" class="internal-item" value="xumo.m3u" checked> xumo.m3u</label>
+            <label><input type="checkbox" class="internal-item" value="xiaomi.m3u" checked> xiaomi.m3u</label>
+          </div>
+        </details>
+        <div class="muted" id="internalStatus" style="margin-top:6px">—</div>
+        <!-- =============================================== -->
       </div>
     </div>
 
@@ -72,15 +95,15 @@
         <input type="file" accept=".m3u,.m3u8" id="playlistFile" />
         <div class="row gap8" style="margin-top:10px">
           <input id="playlistName" placeholder="Nombre de la playlist" style="flex:1"/>
-          <button id="btnGuardarPL">💾 Guardar selección</button>
+          <button id="btnGuardarPL" type="button">💾 Guardar selección</button>
         </div>
         <div class="row gap8" style="margin-top:10px">
           <select id="savedPlaylists" style="flex:1">
             <option value="">Selecciona una lista...</option>
           </select>
-          <button id="btnLoadPL">📂 Cargar</button>
-          <button id="btnDeletePL">🗑️ Eliminar</button>
-          <button id="btnExportPL">⬇️ Exportar (.m3u)</button>
+          <button id="btnLoadPL" type="button">📂 Cargar</button>
+          <button id="btnDeletePL" type="button">🗑️ Eliminar</button>
+          <button id="btnExportPL" type="button">⬇️ Exportar (.m3u)</button>
         </div>
       </div>
 
@@ -88,9 +111,9 @@
         <h3>⭐ Favoritos</h3>
         <select id="favoritosDropdown" multiple size="8" style="width:100%"></select>
         <div class="row gap8" style="margin-top:8px">
-          <button id="btnPlayFav">📺 Reproducir</button>
-          <button id="btnDelFav">❌ Eliminar</button>
-          <button id="btnExportFav">⬇️ Exportar (.m3u)</button>
+          <button id="btnPlayFav" type="button">📺 Reproducir</button>
+          <button id="btnDelFav" type="button">❌ Eliminar</button>
+          <button id="btnExportFav" type="button">⬇️ Exportar (.m3u)</button>
         </div>
 
         <h3 style="margin-top:16px">Categorías</h3>
@@ -98,8 +121,8 @@
           <select id="categoryDropdown" style="flex:1">
             <option value="">Selecciona una categoría...</option>
           </select>
-          <button id="btnNewCat">📝 Crear</button>
-          <button id="btnAddToCat">🔀 Añadir selección</button>
+          <button id="btnNewCat" type="button">📝 Crear</button>
+          <button id="btnAddToCat" type="button">🔀 Añadir selección</button>
         </div>
         <h4 style="margin:12px 0 6px">Canales de esta Categoría</h4>
         <ul id="categoryChannelsList"></ul>
@@ -108,7 +131,7 @@
 
     <div class="panel" style="margin-top:16px">
       <h3>Editor (placeholder)</h3>
-      <button id="toggleEditorBtn">🎛️ Mostrar/ocultar editor</button>
+      <button id="toggleEditorBtn" type="button">🎛️ Mostrar/ocultar editor</button>
       <div id="channelEditor" style="display:none; margin-top:10px" class="muted">Aquí puedes construir tu editor visual más adelante.</div>
     </div>
   </main>
@@ -443,12 +466,89 @@
     setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
   }
 
+  // ========= NUEVO: Auto-carga de listas internas =========
+  const INTERNAL_FILES = ['update2.m3u','xumo.m3u','xiaomi.m3u']; // ponlas junto al index.html o ajusta rutas (p.ej. 'lists/xumo.m3u')
+
+  function setInternalStatus(msg){
+    const el = document.getElementById('internalStatus');
+    if(el) el.textContent = msg;
+  }
+
+  function getSelectedInternal(){
+    const items = Array.from(document.querySelectorAll('.internal-item'));
+    const sel = items.filter(i => i.checked).map(i => i.value);
+    return sel.length ? sel : INTERNAL_FILES.slice();
+  }
+
+  async function fetchTextNoStore(urlString, bust){
+    const u = new URL(urlString, location.href);
+    if(bust) u.searchParams.set('_ts', Date.now().toString());
+    const res = await fetch(u.toString(), { cache: 'no-store' });
+    if(!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    const txt = await res.text();
+    return { url: u.toString(), text: txt };
+  }
+
+  async function loadInternalLists({force=false} = {}){
+    const merge = !!document.getElementById('chkMergeInternal')?.checked;
+    const targets = getSelectedInternal();
+    setInternalStatus('Cargando listas internas…');
+
+    const results = await Promise.allSettled(
+      targets.map(p => fetchTextNoStore(p, force))
+    );
+
+    let all = [], ok = 0, notes = [];
+    for(let i=0;i<results.length;i++){
+      const name = targets[i];
+      const r = results[i];
+      if(r.status === 'fulfilled'){
+        const arr = M3U.parse(r.value.text) || [];
+        ok++; notes.push(`${name}: ${arr.length}`);
+        all.push(...arr);
+      } else {
+        notes.push(`${name}: ERROR`);
+      }
+    }
+
+    const finalList = dedupeByUrl(all);
+    playlist = merge ? dedupeByUrl([...(playlist||[]), ...finalList]) : finalList;
+    populateDropdown();
+    setInternalStatus(ok ? `✅ ${finalList.length} canales (${ok}/${targets.length}) — ${notes.join(' · ')}` : '⚠️ No se pudo cargar (revisa nombres/rutas o abre por http://)');
+  }
+
   // ========= Inicio =========
   window.addEventListener('load', ()=>{
+    // UI y estado
     playlist = [];
     populateDropdown();
     loadAllPlaylists();
     syncSeconds(60);
+
+    // Botones internas
+    const btnLoad = document.getElementById('btnLoadInternal');
+    const btnForce = document.getElementById('btnForceInternal');
+    const autoChk = document.getElementById('chkAutoInternal');
+
+    // Restaurar preferencia de auto-carga
+    const savedAuto = localStorage.getItem('autoInternal') === 'true';
+    if(autoChk) autoChk.checked = savedAuto;
+    autoChk?.addEventListener('change', ()=> {
+      localStorage.setItem('autoInternal', String(autoChk.checked));
+    });
+
+    btnLoad?.addEventListener('click', ()=> loadInternalLists({force:false}));
+    btnForce?.addEventListener('click', ()=> loadInternalLists({force:true}));
+
+    // Auto-cargar si el usuario lo eligió
+    if(savedAuto){
+      loadInternalLists({force:true});
+    }
+
+    // Aviso si se abre como file:// (fetch bloqueado)
+    if(location.protocol === 'file:'){
+      setInternalStatus('⚠️ Abierto como file:// — usa un servidor local (ej. Live Server) o GitHub Pages para cargar listas.');
+    }
   });
   </script>
 </body>
