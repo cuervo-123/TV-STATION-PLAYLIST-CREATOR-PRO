@@ -25,6 +25,7 @@
     .row.gap8{gap:8px}
     .tag{display:inline-block;background:#1e2536;border:1px solid #2b3448;border-radius:999px;padding:4px 10px;font-size:12px;color:#b7c1cc}
     details summary{cursor:pointer}
+    .chip{display:inline-flex;align-items:center;gap:8px;background:#1a2030;border:1px solid #2a3142;border-radius:999px;padding:6px 10px}
   </style>
 </head>
 <body>
@@ -58,14 +59,24 @@
       <div class="col panel">
         <h3>Canales</h3>
         <input id="searchBox" placeholder="Buscar por nombre o categoría..." style="width:100%;margin-bottom:8px"/>
+
+        <!-- CONTROLES RÁPIDOS ARRIBA -->
+        <div class="row gap8" style="margin-bottom:8px;align-items:center;">
+          <button id="btnPlayTop" type="button">📺 Reproducir</button>
+          <button id="btnRandomTop" type="button">🎲 Aleatorio</button>
+          <label class="chip"><input type="checkbox" id="chkClickPlay"> Clic reproduce</label>
+          <span class="muted" style="font-size:12px;">Atajos: Enter/P, R, F</span>
+        </div>
+
         <select id="channelDropdown" multiple size="12" style="width:100%"></select>
+
         <div class="row gap8" style="margin-top:8px">
           <button id="btnPlay" type="button">📺 Reproducir seleccionado</button>
           <button id="btnExportSel" type="button">⬇️ Exportar selección (.m3u)</button>
         </div>
         <div class="muted" style="margin-top:6px"><span id="countLabel">0</span> canales cargados</div>
 
-        <!-- ===== NUEVO: Auto-carga de listas internas ===== -->
+        <!-- ===== Auto-carga de listas internas ===== -->
         <div class="row gap8" style="margin-top:12px; align-items:center;">
           <button id="btnLoadInternal" type="button">📥 Cargar internas</button>
           <button id="btnForceInternal" type="button" title="Ignora caché">↻ Forzar</button>
@@ -85,7 +96,7 @@
           </div>
         </details>
         <div class="muted" id="internalStatus" style="margin-top:6px">—</div>
-        <!-- =============================================== -->
+        <!-- ======================================== -->
       </div>
     </div>
 
@@ -302,7 +313,7 @@
     updateCountdownDisplay('—');
   }
 
-  // ========= Handlers =========
+  // ========= Handlers base =========
   const btnStartAuto = document.getElementById('btnStartAuto');
   const btnPauseAuto = document.getElementById('btnPauseAuto');
   const btnStopAuto = document.getElementById('btnStopAuto');
@@ -332,37 +343,52 @@
     for(const opt of dropdown.options){ opt.style.display = opt.text.toLowerCase().includes(term) ? '' : 'none'; }
   });
 
+  // Botones inferiores
   document.getElementById('btnPlay').addEventListener('click', ()=>{
     const sel = dropdown.value; if(!sel) return alert('Selecciona un canal.');
     playStream(sel);
   });
-  document.getElementById('btnAleatorio').addEventListener('click', ()=>{
-    const pick = pickRandomFromSelection(); if(pick) playStream(pick);
-  });
+  document.getElementById('btnExportSel').addEventListener('click', exportSelectionM3U);
   document.getElementById('btnStop').addEventListener('click', ()=>{ video.pause(); });
   document.getElementById('btnFav').addEventListener('click', agregarAFavoritos);
 
-  document.getElementById('btnGuardarPL').addEventListener('click', savePlaylist);
-  document.getElementById('btnLoadPL').addEventListener('click', ()=>{ loadSavedPlaylist(savedPlaylistsDropdown.value); });
-  document.getElementById('btnDeletePL').addEventListener('click', deleteSelectedPlaylist);
-  document.getElementById('btnExportPL').addEventListener('click', ()=>{
-    const name = savedPlaylistsDropdown.value || 'playlist';
-    const text = M3U.toM3U(playlist);
-    downloadText(text, `${name}.m3u`);
+  // ===== NUEVO: controles rápidos arriba =====
+  document.getElementById('btnPlayTop').addEventListener('click', ()=>{
+    const sel = dropdown.value; if(!sel) return alert('Selecciona un canal.');
+    playStream(sel);
+  });
+  document.getElementById('btnRandomTop').addEventListener('click', ()=>{
+    const pick = pickRandomFromSelection() || dropdown.value;
+    if(pick) playStream(pick);
+  });
+  // Preferencia "Clic reproduce"
+  const clickPlayChk = document.getElementById('chkClickPlay');
+  clickPlayChk.checked = localStorage.getItem('clickPlay') === 'true';
+  clickPlayChk.addEventListener('change', ()=> localStorage.setItem('clickPlay', String(clickPlayChk.checked)));
+
+  // ===== NUEVO: clic sin Cmd/Ctrl para (de)seleccionar y reproducir si está activo =====
+  dropdown.addEventListener('mousedown', (e)=>{
+    const opt = e.target;
+    if(opt && opt.tagName === 'OPTION'){
+      e.preventDefault(); // evita que el navegador maneje selección estándar
+      opt.selected = !opt.selected; // toggle sin teclas
+      // dispara un change “manual” por consistencia
+      dropdown.dispatchEvent(new Event('change', {bubbles:true}));
+      // ¿Clic reproduce?
+      if(clickPlayChk.checked){ playStream(opt.value); }
+    }
   });
 
-  document.getElementById('btnPlayFav').addEventListener('click', reproducirFavorito);
-  document.getElementById('btnDelFav').addEventListener('click', eliminarFavorito);
-  document.getElementById('btnExportFav').addEventListener('click', ()=>{
-    const favs = M3U.parse(localStorage.getItem('favoritos')||'[]');
-    if(!favs.length) return alert('No hay favoritos.');
-    downloadText(M3U.toM3U(favs), 'favoritos.m3u');
+  // ===== NUEVO: atajos y doble-clip/Enter =====
+  dropdown.addEventListener('dblclick', ()=>{ const v = dropdown.value; if(v) playStream(v); });
+  dropdown.addEventListener('keydown', (e)=>{
+    const k = e.key.toLowerCase();
+    if(k === 'enter' || k === 'p'){ const v = dropdown.value; if(v){ e.preventDefault(); playStream(v);} }
+    else if(k === 'r'){ e.preventDefault(); const pick = pickRandomFromSelection() || dropdown.value; if(pick) playStream(pick); }
+    else if(k === 'f'){ e.preventDefault(); agregarAFavoritos(); }
   });
 
-  document.getElementById('btnNewCat').addEventListener('click', createCategory);
-  document.getElementById('btnAddToCat').addEventListener('click', addToCategory);
-  categoryDropdown.addEventListener('change', loadCategoryChannels);
-
+  // Si está en auto-aleatorio y cambias selección manual, resetea el contador
   dropdown.addEventListener('change', ()=>{ if(autoRandom.running){ autoRandom.remaining = autoRandom.seconds; updateCountdownDisplay(`${autoRandom.remaining}s`);} });
 
   function dedupeByUrl(arr){ const seen=new Set(); const out=[]; for(const x of arr){ if(x && x.url && !seen.has(x.url)){ seen.add(x.url); out.push(x); } } return out; }
@@ -466,20 +492,18 @@
     setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
   }
 
-  // ========= NUEVO: Auto-carga de listas internas =========
-  const INTERNAL_FILES = ['update2.m3u','xumo.m3u','xiaomi.m3u']; // ponlas junto al index.html o ajusta rutas (p.ej. 'lists/xumo.m3u')
+  // ========= Auto-carga de listas internas =========
+  const INTERNAL_FILES = ['update2.m3u','xumo.m3u','xiaomi.m3u']; // ajusta rutas si van a una carpeta
 
   function setInternalStatus(msg){
     const el = document.getElementById('internalStatus');
     if(el) el.textContent = msg;
   }
-
   function getSelectedInternal(){
     const items = Array.from(document.querySelectorAll('.internal-item'));
     const sel = items.filter(i => i.checked).map(i => i.value);
     return sel.length ? sel : INTERNAL_FILES.slice();
   }
-
   async function fetchTextNoStore(urlString, bust){
     const u = new URL(urlString, location.href);
     if(bust) u.searchParams.set('_ts', Date.now().toString());
@@ -488,7 +512,6 @@
     const txt = await res.text();
     return { url: u.toString(), text: txt };
   }
-
   async function loadInternalLists({force=false} = {}){
     const merge = !!document.getElementById('chkMergeInternal')?.checked;
     const targets = getSelectedInternal();
@@ -519,7 +542,6 @@
 
   // ========= Inicio =========
   window.addEventListener('load', ()=>{
-    // UI y estado
     playlist = [];
     populateDropdown();
     loadAllPlaylists();
@@ -530,7 +552,6 @@
     const btnForce = document.getElementById('btnForceInternal');
     const autoChk = document.getElementById('chkAutoInternal');
 
-    // Restaurar preferencia de auto-carga
     const savedAuto = localStorage.getItem('autoInternal') === 'true';
     if(autoChk) autoChk.checked = savedAuto;
     autoChk?.addEventListener('change', ()=> {
@@ -540,14 +561,10 @@
     btnLoad?.addEventListener('click', ()=> loadInternalLists({force:false}));
     btnForce?.addEventListener('click', ()=> loadInternalLists({force:true}));
 
-    // Auto-cargar si el usuario lo eligió
-    if(savedAuto){
-      loadInternalLists({force:true});
-    }
+    if(savedAuto){ loadInternalLists({force:true}); }
 
-    // Aviso si se abre como file:// (fetch bloqueado)
     if(location.protocol === 'file:'){
-      setInternalStatus('⚠️ Abierto como file:// — usa un servidor local (ej. Live Server) o GitHub Pages para cargar listas.');
+      setInternalStatus('⚠️ Abierto como file:// — usa un servidor local (Live Server) o GitHub Pages para cargar listas.');
     }
   });
   </script>
