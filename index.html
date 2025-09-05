@@ -16,7 +16,7 @@
     .panel{background:#131722;border:1px solid #222836;border-radius:14px;padding:14px;box-shadow:0 4px 24px rgba(0,0,0,.25)}
     .panel h3{margin:0 0 10px;color:var(--accent)}
     video{width:100%;height:360px;background:black;border-radius:12px}
-    button,select,input{background:#1a2030;color:var(--fg);border:1px solid #2a3142;border-radius:10px;padding:10px 12px;font-size:14px}
+    button,select,input{background:#1a2030;color:var(--fg);border:1px solid #2a3142;border-radius:10px;padding:10px 12px;font-size:14px;touch-action:manipulation}
     button{cursor:pointer}
     button:hover{border-color:#3b465c}
     ul{margin:8px 0 0;padding-left:20px}
@@ -43,15 +43,17 @@
     }
     .channel-item:last-child{ border-bottom:none; }
     .channel-item.selected{ background:#1e2536; }
-    .channel-name{
-      flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-    }
+    .channel-item.cursor{ outline:2px solid #ff9800; outline-offset:-2px; }
+    .channel-name{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .play-btn{
       background:#e53935; border:1px solid #b71c1c; color:#fff;
-      border-radius:8px; padding:6px 10px; font-weight:700;
-      cursor:pointer;
+      border-radius:8px; padding:6px 10px; font-weight:700; cursor:pointer;
     }
     .play-btn:hover{ filter:brightness(1.08); }
+
+    /* Botonera TV grande */
+    .tv-controls{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .btn-remote{ padding:10px 12px; font-weight:700; }
   </style>
 </head>
 <body>
@@ -86,16 +88,18 @@
         <h3>Canales</h3>
         <input id="searchBox" placeholder="Buscar por nombre o categoría..." style="width:100%;margin-bottom:8px"/>
 
-        <!-- Controles rápidos arriba -->
-        <div class="row gap8" style="margin-bottom:8px;align-items:center;">
-          <button id="btnPlayTop" type="button">📺 Reproducir</button>
-          <button id="btnRandomTop" type="button">🎲 Aleatorio</button>
+        <!-- Controles rápidos y TV (arriba) -->
+        <div class="tv-controls" style="margin-bottom:8px;">
+          <button id="btnCursorUp" class="btn-remote" type="button">↑</button>
+          <button id="btnCursorDown" class="btn-remote" type="button">↓</button>
+          <button id="btnCursorToggle" class="btn-remote" type="button">✓ Seleccionar</button>
+          <button id="btnCursorPlay" class="btn-remote" type="button">▶ Reproducir</button>
           <label class="chip"><input type="checkbox" id="chkClickPlay"> Clic reproduce</label>
-          <span class="muted" style="font-size:12px;">Atajos: Enter/P, R, F</span>
+          <span class="muted" style="font-size:12px;">Teclas: ↑/↓, Enter, Space, R, F</span>
         </div>
 
-        <!-- NUEVO: contenedor de canales con botón rojo -->
-        <div id="channelList" class="channel-list"></div>
+        <!-- Lista de canales -->
+        <div id="channelList" class="channel-list" tabindex="0" aria-label="Lista de canales"></div>
 
         <div class="row gap8" style="margin-top:8px">
           <button id="btnPlay" type="button">📺 Reproducir seleccionado</button>
@@ -135,7 +139,9 @@
           <input id="playlistName" placeholder="Nombre de la playlist" style="flex:1"/>
           <button id="btnGuardarPL" type="button">💾 Guardar selección</button>
         </div>
-        <div class="row gap8" style="margin-top:10px">
+        <div class="row gap8" style="margin-top:10px; align-items:center;">
+          <button id="plUp" class="btn-remote" type="button" title="Playlist anterior">PL ↑</button>
+          <button id="plDown" class="btn-remote" type="button" title="Playlist siguiente">PL ↓</button>
           <select id="savedPlaylists" style="flex:1">
             <option value="">Selecciona una lista...</option>
           </select>
@@ -147,7 +153,11 @@
 
       <div class="col panel">
         <h3>⭐ Favoritos</h3>
-        <select id="favoritosDropdown" multiple size="8" style="width:100%"></select>
+        <div class="row gap8" style="align-items:center; margin-bottom:6px;">
+          <button id="favUp" class="btn-remote" type="button" title="Anterior">Fav ↑</button>
+          <button id="favDown" class="btn-remote" type="button" title="Siguiente">Fav ↓</button>
+          <select id="favoritosDropdown" multiple size="8" style="width:100%"></select>
+        </div>
         <div class="row gap8" style="margin-top:8px">
           <button id="btnPlayFav" type="button">📺 Reproducir</button>
           <button id="btnDelFav" type="button">❌ Eliminar</button>
@@ -210,12 +220,12 @@
       let out = ['#EXTM3U'];
       (arr||[]).forEach(ch => {
         const g = ch.group ? ` group-title="${escapeAttr(ch.group)}"` : '';
-        theLogo = ch.logo ? ` tvg-logo="${escapeAttr(ch.logo)}"` : '';
+        const l = ch.logo ? ` tvg-logo="${escapeAttr(ch.logo)}"` : '';
         const name = ch.name || 'Canal';
-        out.push(`#EXTINF:-1${theLogo}${g},${name}`);
+        out.push(`#EXTINF:-1${l}${g},${name}`);
         out.push(ch.url);
       });
-      return out.join('\\n');
+      return out.join('\n');
     }
   };
   function escapeAttr(s){ return (s||'').replace(/"/g,'\\"'); }
@@ -225,9 +235,10 @@
   let currentStream = null;
   const video = document.getElementById('videoPlayer');
 
-  // NUEVO contenedor
+  // Lista canales y selección
   const channelList = document.getElementById('channelList');
   let selectedSet = new Set(); // urls seleccionadas
+  let cursorEl = null;         // fila enfocada para TV
 
   const favoritosDropdown = document.getElementById('favoritosDropdown');
   const savedPlaylistsDropdown = document.getElementById('savedPlaylists');
@@ -264,10 +275,44 @@
     currentStream = url;
   }
 
+  // ========= Helpers canales =========
+  function visibleRows(){
+    return Array.from(channelList.children).filter(r => r.style.display !== 'none');
+  }
+  function setCursor(el){
+    if(!el) return;
+    if(cursorEl) cursorEl.classList.remove('cursor');
+    cursorEl = el;
+    cursorEl.classList.add('cursor');
+    // Asegura visibilidad
+    cursorEl.scrollIntoView({ block:'nearest' });
+  }
+  function moveCursor(delta){
+    const vis = visibleRows();
+    if(!vis.length) return;
+    let idx = cursorEl ? vis.indexOf(cursorEl) : -1;
+    if(idx === -1) idx = 0;
+    else {
+      idx = Math.max(0, Math.min(vis.length-1, idx + delta));
+    }
+    setCursor(vis[idx]);
+  }
+  function toggleSelectCursor(){
+    if(!cursorEl) return;
+    const url = cursorEl.dataset.url;
+    if(selectedSet.has(url)){ selectedSet.delete(url); cursorEl.classList.remove('selected'); }
+    else { selectedSet.add(url); cursorEl.classList.add('selected'); }
+  }
+  function playCursor(){
+    if(!cursorEl) return;
+    playStream(cursorEl.dataset.url);
+  }
+
   // ========= Render de canales (botón rojo) =========
   function populateDropdown(opts = {}) {
     const { preserveScroll=false, autoplayIfEmpty=true } = opts;
     const st = preserveScroll ? channelList.scrollTop : 0;
+    const prevCursorUrl = cursorEl?.dataset?.url || null;
 
     channelList.innerHTML = '';
     playlist.forEach((ch, idx) => {
@@ -293,37 +338,37 @@
     });
 
     countLabel.textContent = String(playlist.length);
+
+    // Restaurar cursor si es posible
+    const vis = visibleRows();
+    const restore = prevCursorUrl ? vis.find(r => r.dataset.url === prevCursorUrl) : vis[0];
+    if (restore) setCursor(restore);
+
     if (autoplayIfEmpty && playlist.length && !currentStream) {
       playStream(playlist[0].url);
     }
     if (preserveScroll) channelList.scrollTop = st;
   }
 
-  // Toggle selección al hacer click en la fila. Si clic en botón rojo, reproduce.
+  // Click en lista
   const clickPlayChk = document.getElementById('chkClickPlay');
   clickPlayChk.checked = localStorage.getItem('clickPlay') === 'true';
   clickPlayChk.addEventListener('change', ()=> localStorage.setItem('clickPlay', String(clickPlayChk.checked)));
 
   channelList.addEventListener('click', (e)=>{
     const btn = e.target.closest('.play-btn');
-    if(btn){
-      playStream(btn.dataset.url);
-      return;
-    }
+    if(btn){ playStream(btn.dataset.url); return; }
     const item = e.target.closest('.channel-item');
     if(!item) return;
+    setCursor(item);
     const url = item.dataset.url;
     if(selectedSet.has(url)){ selectedSet.delete(url); item.classList.remove('selected'); }
     else { selectedSet.add(url); item.classList.add('selected'); }
-
-    // clic reproduce (opcional)
     if(clickPlayChk.checked) playStream(url);
-
-    // si está corriendo el auto-aleatorio, reinicia contador
     if(autoRandom.running){ autoRandom.remaining = autoRandom.seconds; updateCountdownDisplay(`${autoRandom.remaining}s`); }
   });
 
-  // Filtro con preservación de scroll
+  // Filtro con preservación de scroll + cursor
   document.getElementById('searchBox').addEventListener('input', (e)=>{
     const term = e.target.value.toLowerCase();
     const st = channelList.scrollTop;
@@ -331,21 +376,35 @@
       const txt = row.querySelector('.channel-name')?.textContent.toLowerCase() || '';
       row.style.display = txt.includes(term) ? '' : 'none';
     }
+    // Reposicionar cursor al primer visible si quedó oculto
+    if(cursorEl && cursorEl.style.display === 'none'){
+      const vis = visibleRows();
+      if(vis[0]) setCursor(vis[0]);
+      else { if(cursorEl) cursorEl.classList.remove('cursor'); cursorEl = null; }
+    }
     channelList.scrollTop = st;
     requestAnimationFrame(()=>{ channelList.scrollTop = st; });
   });
 
-  // Helpers selección
-  function getSelectedItems(){
-    if(!selectedSet.size) return [];
-    const map = new Map(playlist.map(ch => [ch.url, ch]));
-    return Array.from(selectedSet).map(u => map.get(u)).filter(Boolean);
-  }
-  function pickRandomFromSelection(){
-    const sel = getSelectedItems();
-    if(!sel.length){ alert('Selecciona uno o más canales en la lista.'); return null; }
-    return sel[Math.floor(Math.random()*sel.length)].url;
-  }
+  // Controles TV (botones)
+  document.getElementById('btnCursorUp').addEventListener('click', ()=> moveCursor(-1));
+  document.getElementById('btnCursorDown').addEventListener('click', ()=> moveCursor(1));
+  document.getElementById('btnCursorToggle').addEventListener('click', toggleSelectCursor);
+  document.getElementById('btnCursorPlay').addEventListener('click', playCursor);
+
+  // Teclas TV
+  document.addEventListener('keydown', (e)=>{
+    const tag = (document.activeElement && document.activeElement.tagName) || '';
+    const inText = tag === 'INPUT' || tag === 'TEXTAREA';
+    if(inText) return; // no molestar al escribir
+
+    if(e.key === 'ArrowUp'){ e.preventDefault(); moveCursor(-1); }
+    else if(e.key === 'ArrowDown'){ e.preventDefault(); moveCursor(1); }
+    else if(e.key === 'Enter'){ e.preventDefault(); playCursor(); }
+    else if(e.key === ' ' || e.code === 'Space'){ e.preventDefault(); toggleSelectCursor(); }
+    else if(e.key.toLowerCase() === 'r'){ e.preventDefault(); const pick = pickRandomFromSelection(); if(pick) playStream(pick); }
+    else if(e.key.toLowerCase() === 'f'){ e.preventDefault(); agregarAFavoritos(); }
+  });
 
   // ========= Temporizador Auto-Aleatorio =========
   const autoRandom = { running:false, tick:null, seconds:60, remaining:0 };
@@ -362,9 +421,17 @@
   }
   if(randSecondsInput) randSecondsInput.addEventListener('input', e => syncSeconds(e.target.value));
   if(randRangeInput) randRangeInput.addEventListener('input', e => syncSeconds(e.target.value));
-
   function updateCountdownDisplay(v){ if(countdownLabel) countdownLabel.textContent = `Próximo cambio en ${v}`; }
-
+  function getSelectedItems(){
+    if(!selectedSet.size) return [];
+    const map = new Map(playlist.map(ch => [ch.url, ch]));
+    return Array.from(selectedSet).map(u => map.get(u)).filter(Boolean);
+  }
+  function pickRandomFromSelection(){
+    const sel = getSelectedItems();
+    if(!sel.length){ alert('Selecciona uno o más canales en la lista.'); return null; }
+    return sel[Math.floor(Math.random()*sel.length)].url;
+  }
   function startAutoRandom(){
     if(autoRandom.tick) clearInterval(autoRandom.tick);
     const sel = getSelectedItems();
@@ -411,7 +478,7 @@
     updateCountdownDisplay('—');
   }
 
-  // ========= Botones y handlers =========
+  // ========= Botones y handlers base =========
   document.getElementById('btnStartAuto').addEventListener('click', ()=>{ syncSeconds(randSecondsInput.value); startAutoRandom(); });
   document.getElementById('btnPauseAuto').addEventListener('click', ()=>{ if(autoRandom.running) pauseAutoRandom(); else resumeAutoRandom(); });
   document.getElementById('btnStopAuto').addEventListener('click', stopAutoRandom);
@@ -438,20 +505,15 @@
     if(!sel.length) return alert('Selecciona uno o más canales.');
     playStream(sel[0].url);
   });
-  document.getElementById('btnPlayTop').addEventListener('click', ()=>{
-    const sel = getSelectedItems();
-    if(!sel.length) return alert('Selecciona uno o más canales.');
-    playStream(sel[0].url);
-  });
-  document.getElementById('btnRandomTop').addEventListener('click', ()=>{ const pick = pickRandomFromSelection(); if(pick) playStream(pick); });
   document.getElementById('btnAleatorio').addEventListener('click', ()=>{ const pick = pickRandomFromSelection(); if(pick) playStream(pick); });
   document.getElementById('btnStop').addEventListener('click', ()=>{ video.pause(); });
   document.getElementById('btnFav').addEventListener('click', agregarAFavoritos);
 
-  // Atajos de teclado sobre lista
+  // Atajos de teclado sobre contenedor (por si toma foco)
   channelList.addEventListener('keydown', (e)=>{
     const k = e.key.toLowerCase();
-    if(k === 'enter' || k === 'p'){ const sel = getSelectedItems(); if(sel.length){ e.preventDefault(); playStream(sel[0].url);} }
+    if(k === 'enter'){ e.preventDefault(); playCursor(); }
+    else if(k === ' '){ e.preventDefault(); toggleSelectCursor(); }
     else if(k === 'r'){ e.preventDefault(); const pick = pickRandomFromSelection(); if(pick) playStream(pick); }
     else if(k === 'f'){ e.preventDefault(); agregarAFavoritos(); }
   });
@@ -507,6 +569,21 @@
     downloadText(M3U.toM3U(playlist), `${name}.m3u`);
   });
 
+  // ===== Navegación con flechas en FAVORITOS y PLAYLISTS =====
+  function moveSelect(el, delta){
+    if(!el || !el.options || !el.options.length) return;
+    const max = el.options.length - 1;
+    let idx = el.selectedIndex;
+    if(idx < 0) idx = 0;
+    idx = Math.max(0, Math.min(max, idx + delta));
+    el.selectedIndex = idx;
+    el.focus();
+  }
+  document.getElementById('favUp').addEventListener('click', ()=> moveSelect(favoritosDropdown, -1));
+  document.getElementById('favDown').addEventListener('click', ()=> moveSelect(favoritosDropdown, 1));
+  document.getElementById('plUp').addEventListener('click', ()=> moveSelect(savedPlaylistsDropdown, -1));
+  document.getElementById('plDown').addEventListener('click', ()=> moveSelect(savedPlaylistsDropdown, 1));
+
   // ========= Favoritos =========
   function agregarAFavoritos(){
     if(!currentStream) return alert('No hay canal reproduciéndose.');
@@ -539,11 +616,10 @@
     downloadText(M3U.toM3U(favs), 'favoritos.m3u');
   });
 
-  // ========= Categorías (arreglado) =========
+  // ========= Categorías =========
   function createCategory(){
     let name = (prompt('Nombre de la nueva categoría:')||'').trim();
     if(!name) return;
-    // nombre seguro para key
     name = name.replace(/\s+/g,' ').trim();
     const key = `cat_${name}`;
     if(!localStorage.getItem(key)){
