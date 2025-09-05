@@ -96,6 +96,7 @@
                 <option value="update2.m3u">update2.m3u</option>
                 <option value="xumo.m3u">xumo.m3u</option>
                 <option value="xiaomi.m3u">xiaomi.m3u</option>
+                <option value="localnow.m3u">localnow.m3u</option>
               </select>
               <div class="row gap8" style="flex-wrap:wrap;">
                 <button id="btnSelAllInternal">Seleccionar todo</button>
@@ -486,7 +487,7 @@
   }
 
   // ========= Auto-carga de listas internas =========
-  const INTERNAL_PLAYLISTS = [ 'update2.m3u', 'xumo.m3u', 'xiaomi.m3u' ];
+  const INTERNAL_PLAYLISTS = [ 'update2.m3u', 'xumo.m3u','localnow.m3u' 'xiaomi.m3u' ];
   function setInternalStatus(msg){ const el = document.getElementById('internalStatus'); if(el) el.textContent = msg; }
 
   async function fetchTextSafe(path){
