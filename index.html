@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mi TV Station</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <style>
+    :root{--bg:#0f1115;--fg:#e6e8eb;--accent:#00ffd5;--muted:#9aa4af}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}
+    header,main{padding:16px;max-width:1100px;margin:0 auto}
+    h1{margin:0 0 12px;font-weight:800;letter-spacing:.3px}
+    .row{display:flex;gap:16px;flex-wrap:wrap}
+    .col{flex:1 1 350px;min-width:300px}
+    .panel{background:#131722;border:1px solid #222836;border-radius:14px;padding:14px;box-shadow:0 4px 24px rgba(0,0,0,.25)}
+    .panel h3{margin:0 0 10px;color:var(--accent)}
+    video{width:100%;height:360px;background:black;border-radius:12px}
+    button,select,input{background:#1a2030;color:var(--fg);border:1px solid #2a3142;border-radius:10px;padding:10px 12px;font-size:14px}
+    button{cursor:pointer}
+    button:hover{border-color:#3b465c}
+    select[multiple]{height:260px}
+    ul{margin:8px 0 0;padding-left:20px}
+    .muted{color:var(--muted)}
+    .row.gap8{gap:8px}
+    .tag{display:inline-block;background:#1e2536;border:1px solid #2b3448;border-radius:999px;padding:4px 10px;font-size:12px;color:#b7c1cc}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📺 Mi TV Station</h1>
+    <p class="muted">Carga listas <span class="tag">.m3u</span> / <span class="tag">.m3u8</span>, guarda favoritos, playlists y categorías. Reproduce HLS con <strong>HLS.js</strong>.</p>
+  </header>
+
+  <main>
+    <div class="row">
+      <div class="col panel">
+        <h3>Reproductor</h3>
+        <video id="videoPlayer" controls autoplay playsinline></video>
+        <div class="row gap8" style="margin-top:10px">
+          <button id="btnFav">⭐ Agregar a Favoritos</button>
+          <button id="btnAleatorio">▶️ Reproducir selección aleatoria</button>
+          <button id="btnStop">⏹️ Stop</button>
+        </div>
+        <!-- Temporizador externo para modo Auto-Aleatorio -->
+        <div class="row" id="autoRandomControls" style="margin-top:10px; gap:8px; align-items:center;">
+          <span class="muted">⏱️ Temporizador (segundos):</span>
+          <input type="number" id="randSeconds" min="5" max="3600" step="5" value="60" style="width:110px"/>
+          <input type="range" id="randRange" min="5" max="1800" step="5" value="60" style="flex:1"/>
+          <button id="btnStartAuto">🔁 Iniciar Auto</button>
+          <button id="btnPauseAuto">⏸️ Pausa/Continuar</button>
+          <button id="btnStopAuto">⏹️ Detener Auto</button>
+        </div>
+        <div class="muted" id="countdownLabel" style="margin-top:4px">Próximo cambio en —</div>
+      </div>
+
+      <div class="col panel">
+        <h3>Canales</h3>
+        <input id="searchBox" placeholder="Buscar por nombre o categoría..." style="width:100%;margin-bottom:8px"/>
+        <select id="channelDropdown" multiple size="12" style="width:100%"></select>
+        <div class="row gap8" style="margin-top:8px">
+          <button id="btnPlay">📺 Reproducir seleccionado</button>
+          <button id="btnExportSel">⬇️ Exportar selección (.m3u)</button>
+        </div>
+        <div class="muted" style="margin-top:6px"><span id="countLabel">0</span> canales cargados</div>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:16px">
+      <div class="col panel">
+        <h3>Importar / Guardar Playlists</h3>
+        <input type="file" accept=".m3u,.m3u8" id="playlistFile" />
+        <div class="row gap8" style="margin-top:10px">
+          <input id="playlistName" placeholder="Nombre de la playlist" style="flex:1"/>
+          <button id="btnGuardarPL">💾 Guardar selección</button>
+        </div>
+        <div class="row gap8" style="margin-top:10px">
+          <select id="savedPlaylists" style="flex:1">
+            <option value="">Selecciona una lista...</option>
+          </select>
+          <button id="btnLoadPL">📂 Cargar</button>
+          <button id="btnDeletePL">🗑️ Eliminar</button>
+          <button id="btnExportPL">⬇️ Exportar (.m3u)</button>
+        </div>
+      </div>
+
+      <div class="col panel">
+        <h3>⭐ Favoritos</h3>
+        <select id="favoritosDropdown" multiple size="8" style="width:100%"></select>
+        <div class="row gap8" style="margin-top:8px">
+          <button id="btnPlayFav">📺 Reproducir</button>
+          <button id="btnDelFav">❌ Eliminar</button>
+          <button id="btnExportFav">⬇️ Exportar (.m3u)</button>
+        </div>
+
+        <h3 style="margin-top:16px">Categorías</h3>
+        <div class="row gap8">
+          <select id="categoryDropdown" style="flex:1">
+            <option value="">Selecciona una categoría...</option>
+          </select>
+          <button id="btnNewCat">📝 Crear</button>
+          <button id="btnAddToCat">🔀 Añadir selección</button>
+        </div>
+        <h4 style="margin:12px 0 6px">Canales de esta Categoría</h4>
+        <ul id="categoryChannelsList"></ul>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:16px">
+      <h3>Editor (placeholder)</h3>
+      <button id="toggleEditorBtn">🎛️ Mostrar/ocultar editor</button>
+      <div id="channelEditor" style="display:none; margin-top:10px" class="muted">Aquí puedes construir tu editor visual más adelante.</div>
+    </div>
+  </main>
+
+  <script>
+  // ========= Utilidades M3U / JSON =========
+  const M3U = {
+    parse(text){
+      if(!text || !text.trim()) return [];
+      const t = text.trim();
+      if(t.startsWith('[') || t.startsWith('{')){
+        try{
+          const data = JSON.parse(t);
+          if(Array.isArray(data)) return data.filter(x => x && x.url && x.name);
+          if(data && Array.isArray(data.items)) return data.items.filter(x => x && x.url && x.name);
+        }catch(e){}
+      }
+      const lines = t.split(/\r?\n/).map(l => l.trim());
+      const out = [];
+      let meta = null;
+      for(let i=0;i<lines.length;i++){
+        const line = lines[i];
+        if(!line || line.startsWith('#EXTM3U')) continue;
+        if(line.startsWith('#EXTINF')){
+          const name = (line.split(',')[1] || '').trim();
+          const logoMatch = line.match(/tvg-logo="([^"]+)"/i);
+          const groupMatch = line.match(/group-title="([^"]+)"/i);
+          meta = { name: name || 'Canal', logo: logoMatch?logoMatch[1]:undefined, group: groupMatch?groupMatch[1]:undefined };
+        } else if(!line.startsWith('#')){
+          if(meta){ out.push({ name: meta.name, url: line, logo: meta.logo, group: meta.group }); meta = null; }
+          else { out.push({ name: 'Canal', url: line }); }
+        }
+      }
+      return out;
+    },
+    stringify(arr){ try{ return JSON.stringify(arr || []); }catch(e){ return '[]'; } },
+    toM3U(arr){
+      let out = ['#EXTM3U'];
+      (arr||[]).forEach(ch => {
+        const g = ch.group ? ` group-title="${escapeAttr(ch.group)}"` : '';
+        const l = ch.logo ? ` tvg-logo="${escapeAttr(ch.logo)}"` : '';
+        const name = ch.name || 'Canal';
+        out.push(`#EXTINF:-1${l}${g},${name}`);
+        out.push(ch.url);
+      });
+      return out.join('\n');
+    }
+  };
+  function escapeAttr(s){ return (s||'').replace(/"/g,'\\"'); }
+
+  // ========= Estado principal =========
+  let playlist = [];
+  let currentStream = null;
+  const video = document.getElementById('videoPlayer');
+  const dropdown = document.getElementById('channelDropdown');
+  const favoritosDropdown = document.getElementById('favoritosDropdown');
+  const savedPlaylistsDropdown = document.getElementById('savedPlaylists');
+  const categoryDropdown = document.getElementById('categoryDropdown');
+  const fileInput = document.getElementById('playlistFile');
+  const categoryChannelsList = document.getElementById('categoryChannelsList');
+  const countLabel = document.getElementById('countLabel');
+
+  // ========= Reproducción (HLS.js) =========
+  let hlsInstance = null;
+  function playStream(url){
+    if(!url) return;
+    if(hlsInstance){ try{ hlsInstance.destroy(); }catch(e){} hlsInstance = null; }
+
+    const isHLS = /\.m3u8(\?|$)/i.test(url) || url.includes('.m3u8');
+    if(isHLS && Hls.isSupported()){
+      hlsInstance = new Hls({ enableWorker:true, lowLatencyMode:true });
+      hlsInstance.loadSource(url);
+      hlsInstance.attachMedia(video);
+      hlsInstance.on(Hls.Events.MANIFEST_PARSED,()=>{ video.play().catch(()=>{}); });
+      hlsInstance.on(Hls.Events.ERROR,(evt,data)=>{
+        if(data && data.fatal){
+          switch(data.type){
+            case Hls.ErrorTypes.NETWORK_ERROR: hlsInstance.startLoad(); break;
+            case Hls.ErrorTypes.MEDIA_ERROR: hlsInstance.recoverMediaError(); break;
+            default: try{ hlsInstance.destroy(); }catch(e){}
+          }
+        }
+      });
+    } else {
+      video.src = url;
+      video.play().catch(()=>{});
+    }
+    currentStream = url;
+  }
+
+  // ========= Lista =========
+  function populateDropdown(){
+    dropdown.innerHTML = '';
+    (playlist||[]).forEach(ch => {
+      const opt = document.createElement('option');
+      opt.value = ch.url; opt.text = ch.name + (ch.group?` — ${ch.group}`:'');
+      dropdown.appendChild(opt);
+    });
+    countLabel.textContent = String(playlist.length);
+    if(playlist.length){ dropdown.selectedIndex = 0; playStream(playlist[0].url); }
+  }
+
+  // ========= Temporizador Auto-Aleatorio =========
+  const autoRandom = { running:false, tick:null, seconds:60, remaining:0 };
+  const randSecondsInput = document.getElementById('randSeconds');
+  const randRangeInput = document.getElementById('randRange');
+  const countdownLabel = document.getElementById('countdownLabel');
+
+  function syncSeconds(val){
+    const n = Math.max(5, Math.min(3600, parseInt(val||60,10)));
+    if(randSecondsInput) randSecondsInput.value = n;
+    if(randRangeInput) randRangeInput.value = Math.min(n, parseInt(randRangeInput.max||1800,10));
+    autoRandom.seconds = n;
+    if(!autoRandom.running) updateCountdownDisplay('—');
+  }
+  if(randSecondsInput) randSecondsInput.addEventListener('input', e => syncSeconds(e.target.value));
+  if(randRangeInput) randRangeInput.addEventListener('input', e => syncSeconds(e.target.value));
+
+  function updateCountdownDisplay(v){ if(countdownLabel) countdownLabel.textContent = `Próximo cambio en ${v}`; }
+  function pickRandomFromSelection(){
+    const selectedOptions = Array.from(dropdown.selectedOptions);
+    if(selectedOptions.length===0){ alert('Selecciona uno o más canales en la lista.'); return null; }
+    return selectedOptions[Math.floor(Math.random()*selectedOptions.length)].value;
+  }
+  function startAutoRandom(){
+    if(autoRandom.tick) clearInterval(autoRandom.tick);
+    const sel = Array.from(dropdown.selectedOptions);
+    if(sel.length===0) { alert('Selecciona uno o más canales para el modo Auto.'); return; }
+    autoRandom.running = true;
+    autoRandom.remaining = autoRandom.seconds;
+    const first = pickRandomFromSelection();
+    if(first) playStream(first);
+    autoRandom.tick = setInterval(()=>{
+      autoRandom.remaining -= 1;
+      if(autoRandom.remaining <= 0){
+        const next = pickRandomFromSelection();
+        if(next) playStream(next);
+        autoRandom.remaining = autoRandom.seconds;
+      }
+      updateCountdownDisplay(`${autoRandom.remaining}s`);
+    }, 1000);
+  }
+  function pauseAutoRandom(){
+    if(!autoRandom.running) return;
+    autoRandom.running = false;
+    if(autoRandom.tick) { clearInterval(autoRandom.tick); autoRandom.tick = null; }
+    updateCountdownDisplay('pausado');
+  }
+  function resumeAutoRandom(){
+    if(autoRandom.running) return;
+    if(autoRandom.remaining<=0) autoRandom.remaining = autoRandom.seconds;
+    autoRandom.running = true;
+    if(autoRandom.tick) clearInterval(autoRandom.tick);
+    autoRandom.tick = setInterval(()=>{
+      autoRandom.remaining -= 1;
+      if(autoRandom.remaining <= 0){
+        const next = pickRandomFromSelection();
+        if(next) playStream(next);
+        autoRandom.remaining = autoRandom.seconds;
+      }
+      updateCountdownDisplay(`${autoRandom.remaining}s`);
+    },1000);
+  }
+  function stopAutoRandom(){
+    autoRandom.running = false;
+    if(autoRandom.tick) { clearInterval(autoRandom.tick); autoRandom.tick = null; }
+    autoRandom.remaining = 0;
+    updateCountdownDisplay('—');
+  }
+
+  // ========= Handlers =========
+  const btnStartAuto = document.getElementById('btnStartAuto');
+  const btnPauseAuto = document.getElementById('btnPauseAuto');
+  const btnStopAuto = document.getElementById('btnStopAuto');
+  if(btnStartAuto) btnStartAuto.addEventListener('click', ()=>{ syncSeconds(randSecondsInput.value); startAutoRandom(); });
+  if(btnPauseAuto) btnPauseAuto.addEventListener('click', ()=>{ if(autoRandom.running) pauseAutoRandom(); else resumeAutoRandom(); });
+  if(btnStopAuto) btnStopAuto.addEventListener('click', stopAutoRandom);
+
+  const fileInputHandler = (evt)=>{
+    const file = evt.target.files && evt.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      try{
+        const text = e.target.result;
+        const items = M3U.parse(text);
+        if(!items.length) throw new Error('Lista vacía o formato no reconocido');
+        playlist = dedupeByUrl(items);
+        populateDropdown();
+      }catch(err){ console.error(err); alert('Error al cargar el playlist. Verifica el formato .m3u/.m3u8'); }
+    };
+    reader.readAsText(file);
+  };
+  fileInput.addEventListener('change', fileInputHandler);
+
+  document.getElementById('searchBox').addEventListener('input', (e)=>{
+    const term = e.target.value.toLowerCase();
+    for(const opt of dropdown.options){ opt.style.display = opt.text.toLowerCase().includes(term) ? '' : 'none'; }
+  });
+
+  document.getElementById('btnPlay').addEventListener('click', ()=>{
+    const sel = dropdown.value; if(!sel) return alert('Selecciona un canal.');
+    playStream(sel);
+  });
+  document.getElementById('btnAleatorio').addEventListener('click', ()=>{
+    const pick = pickRandomFromSelection(); if(pick) playStream(pick);
+  });
+  document.getElementById('btnStop').addEventListener('click', ()=>{ video.pause(); });
+  document.getElementById('btnFav').addEventListener('click', agregarAFavoritos);
+
+  document.getElementById('btnGuardarPL').addEventListener('click', savePlaylist);
+  document.getElementById('btnLoadPL').addEventListener('click', ()=>{ loadSavedPlaylist(savedPlaylistsDropdown.value); });
+  document.getElementById('btnDeletePL').addEventListener('click', deleteSelectedPlaylist);
+  document.getElementById('btnExportPL').addEventListener('click', ()=>{
+    const name = savedPlaylistsDropdown.value || 'playlist';
+    const text = M3U.toM3U(playlist);
+    downloadText(text, `${name}.m3u`);
+  });
+
+  document.getElementById('btnPlayFav').addEventListener('click', reproducirFavorito);
+  document.getElementById('btnDelFav').addEventListener('click', eliminarFavorito);
+  document.getElementById('btnExportFav').addEventListener('click', ()=>{
+    const favs = M3U.parse(localStorage.getItem('favoritos')||'[]');
+    if(!favs.length) return alert('No hay favoritos.');
+    downloadText(M3U.toM3U(favs), 'favoritos.m3u');
+  });
+
+  document.getElementById('btnNewCat').addEventListener('click', createCategory);
+  document.getElementById('btnAddToCat').addEventListener('click', addToCategory);
+  categoryDropdown.addEventListener('change', loadCategoryChannels);
+
+  dropdown.addEventListener('change', ()=>{ if(autoRandom.running){ autoRandom.remaining = autoRandom.seconds; updateCountdownDisplay(`${autoRandom.remaining}s`);} });
+
+  function dedupeByUrl(arr){ const seen=new Set(); const out=[]; for(const x of arr){ if(x && x.url && !seen.has(x.url)){ seen.add(x.url); out.push(x); } } return out; }
+
+  // ========= Playlists localStorage =========
+  function savePlaylist(){
+    const name = (document.getElementById('playlistName').value||'').trim();
+    if(!name) return alert('Escribe un nombre para la playlist');
+    const selected = Array.from(dropdown.selectedOptions).map(opt => ({ name: opt.text, url: opt.value }));
+    if(!selected.length) return alert('Selecciona al menos un canal');
+    localStorage.setItem(`playlist_${name}`, M3U.stringify(selected));
+    loadAllPlaylists();
+    alert('Playlist guardada.');
+  }
+  function loadSavedPlaylist(name){ if(!name) return; const saved = localStorage.getItem(`playlist_${name}`); if(saved){ playlist = M3U.parse(saved); populateDropdown(); } }
+  function deleteSelectedPlaylist(){ const name = savedPlaylistsDropdown.value; if(!name) return alert('Selecciona una playlist guardada'); localStorage.removeItem(`playlist_${name}`); loadAllPlaylists(); }
+  function loadAllPlaylists(){
+    savedPlaylistsDropdown.innerHTML = '<option value="">Selecciona una lista...</option>';
+    for(const key of Object.keys(localStorage)){
+      if(key.startsWith('playlist_')){
+        const name = key.replace('playlist_','');
+        const opt = document.createElement('option');
+        opt.value = name; opt.text = name; savedPlaylistsDropdown.appendChild(opt);
+      }
+    }
+    loadFavoritos();
+    loadAllCategories();
+  }
+
+  // ========= Favoritos =========
+  function agregarAFavoritos(){
+    if(!currentStream) return alert('No hay canal reproduciéndose.');
+    const canal = (playlist||[]).find(c => c.url===currentStream);
+    const name = canal ? canal.name : (prompt('Nombre para el favorito:')||'Canal');
+    let favs = M3U.parse(localStorage.getItem('favoritos')||'[]');
+    if(!favs.find(f => f.url===currentStream)) favs.push({ name, url: currentStream });
+    localStorage.setItem('favoritos', M3U.stringify(favs));
+    loadFavoritos();
+  }
+  function loadFavoritos(){
+    favoritosDropdown.innerHTML='';
+    const favs = M3U.parse(localStorage.getItem('favoritos')||'[]');
+    for(const f of favs){ const o=document.createElement('option'); o.value=f.url; o.text=f.name; favoritosDropdown.appendChild(o); }
+  }
+  function reproducirFavorito(){ const url = favoritosDropdown.value; if(!url) return alert('Selecciona un canal favorito'); playStream(url); }
+  function eliminarFavorito(){ const url = favoritosDropdown.value; if(!url) return; let favs = M3U.parse(localStorage.getItem('favoritos')||'[]'); favs = favs.filter(f=>f.url!==url); localStorage.setItem('favoritos', M3U.stringify(favs)); loadFavoritos(); }
+
+  // ========= Categorías =========
+  function createCategory(){
+    const name = (prompt('Nombre de la nueva categoría:')||'').trim();
+    if(!name) return;
+    const key = `cat_${name}`;
+    if(!localStorage.getItem(key)){
+      localStorage.setItem(key, M3U.stringify([]));
+      loadAllCategories();
+      alert('Categoría creada.');
+    } else { alert('Ya existe una categoría con ese nombre.'); }
+  }
+  function loadAllCategories(){
+    categoryDropdown.innerHTML = '<option value="">Selecciona una categoría...</option>';
+    for(const key of Object.keys(localStorage)){
+      if(key.startsWith('cat_')){
+        const name = key.replace('cat_','');
+        const opt = document.createElement('option'); opt.value=name; opt.text=name; categoryDropdown.appendChild(opt);
+      }
+    }
+  }
+  function addToCategory(){
+    const cat = categoryDropdown.value; if(!cat) return alert('Selecciona una categoría primero');
+    const selected = Array.from(dropdown.selectedOptions).map(opt => ({ name: opt.text, url: opt.value }));
+    let data = M3U.parse(localStorage.getItem(`cat_${cat}`)||'[]');
+    for(const c of selected){ if(!data.find(d=>d.url===c.url)) data.push(c); }
+    localStorage.setItem(`cat_${cat}`, M3U.stringify(data));
+    alert('Canales añadidos a la categoría');
+    if(categoryDropdown.value===cat) loadCategoryChannels();
+  }
+  function loadCategoryChannels(){
+    const cat = categoryDropdown.value; categoryChannelsList.innerHTML='';
+    if(!cat) return;
+    const channels = M3U.parse(localStorage.getItem(`cat_${cat}`)||'[]');
+    for(const ch of channels){
+      const li=document.createElement('li'); li.textContent=ch.name; li.style.cursor='pointer';
+      li.onclick=()=> playStream(ch.url);
+      categoryChannelsList.appendChild(li);
+    }
+  }
+
+  // ========= Exportaciones =========
+  function exportSelectionM3U(){
+    const selected = Array.from(dropdown.selectedOptions).map(opt => ({ name: opt.text, url: opt.value }));
+    if(!selected.length) return alert('Selecciona uno o más canales.');
+    const text = M3U.toM3U(selected);
+    downloadText(text, 'seleccion.m3u');
+  }
+  function downloadText(text, filename){
+    const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+  }
+
+  // ========= Inicio =========
+  window.addEventListener('load', ()=>{
+    playlist = [];
+    populateDropdown();
+    loadAllPlaylists();
+    syncSeconds(60);
+  });
+  </script>
+</body>
+</html>
