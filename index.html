@@ -19,13 +19,39 @@
     button,select,input{background:#1a2030;color:var(--fg);border:1px solid #2a3142;border-radius:10px;padding:10px 12px;font-size:14px}
     button{cursor:pointer}
     button:hover{border-color:#3b465c}
-    select[multiple]{height:260px}
     ul{margin:8px 0 0;padding-left:20px}
     .muted{color:var(--muted)}
     .row.gap8{gap:8px}
     .tag{display:inline-block;background:#1e2536;border:1px solid #2b3448;border-radius:999px;padding:4px 10px;font-size:12px;color:#b7c1cc}
     details summary{cursor:pointer}
     .chip{display:inline-flex;align-items:center;gap:8px;background:#1a2030;border:1px solid #2a3142;border-radius:999px;padding:6px 10px}
+
+    /* ===== Listado de canales con botón rojo ===== */
+    .channel-list{
+      width:100%;
+      max-height: 300px;
+      overflow:auto;
+      border:1px solid #2a3142;
+      border-radius:10px;
+      background:#0f121a;
+    }
+    .channel-item{
+      display:flex; align-items:center; gap:10px;
+      padding:8px 10px;
+      border-bottom:1px solid #1f2533;
+      user-select:none; cursor:pointer;
+    }
+    .channel-item:last-child{ border-bottom:none; }
+    .channel-item.selected{ background:#1e2536; }
+    .channel-name{
+      flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+    .play-btn{
+      background:#e53935; border:1px solid #b71c1c; color:#fff;
+      border-radius:8px; padding:6px 10px; font-weight:700;
+      cursor:pointer;
+    }
+    .play-btn:hover{ filter:brightness(1.08); }
   </style>
 </head>
 <body>
@@ -60,7 +86,7 @@
         <h3>Canales</h3>
         <input id="searchBox" placeholder="Buscar por nombre o categoría..." style="width:100%;margin-bottom:8px"/>
 
-        <!-- CONTROLES RÁPIDOS ARRIBA -->
+        <!-- Controles rápidos arriba -->
         <div class="row gap8" style="margin-bottom:8px;align-items:center;">
           <button id="btnPlayTop" type="button">📺 Reproducir</button>
           <button id="btnRandomTop" type="button">🎲 Aleatorio</button>
@@ -68,7 +94,8 @@
           <span class="muted" style="font-size:12px;">Atajos: Enter/P, R, F</span>
         </div>
 
-        <select id="channelDropdown" multiple size="12" style="width:100%"></select>
+        <!-- NUEVO: contenedor de canales con botón rojo -->
+        <div id="channelList" class="channel-list"></div>
 
         <div class="row gap8" style="margin-top:8px">
           <button id="btnPlay" type="button">📺 Reproducir seleccionado</button>
@@ -183,12 +210,12 @@
       let out = ['#EXTM3U'];
       (arr||[]).forEach(ch => {
         const g = ch.group ? ` group-title="${escapeAttr(ch.group)}"` : '';
-        const l = ch.logo ? ` tvg-logo="${escapeAttr(ch.logo)}"` : '';
+        theLogo = ch.logo ? ` tvg-logo="${escapeAttr(ch.logo)}"` : '';
         const name = ch.name || 'Canal';
-        out.push(`#EXTINF:-1${l}${g},${name}`);
+        out.push(`#EXTINF:-1${theLogo}${g},${name}`);
         out.push(ch.url);
       });
-      return out.join('\n');
+      return out.join('\\n');
     }
   };
   function escapeAttr(s){ return (s||'').replace(/"/g,'\\"'); }
@@ -197,7 +224,11 @@
   let playlist = [];
   let currentStream = null;
   const video = document.getElementById('videoPlayer');
-  const dropdown = document.getElementById('channelDropdown');
+
+  // NUEVO contenedor
+  const channelList = document.getElementById('channelList');
+  let selectedSet = new Set(); // urls seleccionadas
+
   const favoritosDropdown = document.getElementById('favoritosDropdown');
   const savedPlaylistsDropdown = document.getElementById('savedPlaylists');
   const categoryDropdown = document.getElementById('categoryDropdown');
@@ -233,37 +264,87 @@
     currentStream = url;
   }
 
-  // ========= Lista (con preservación de selección/scroll) =========
+  // ========= Render de canales (botón rojo) =========
   function populateDropdown(opts = {}) {
-    const {
-      preserveSelection = false,
-      preserveScroll = false,
-      autoplayIfEmpty = true,
-    } = opts;
+    const { preserveScroll=false, autoplayIfEmpty=true } = opts;
+    const st = preserveScroll ? channelList.scrollTop : 0;
 
-    const prevSelected = preserveSelection
-      ? new Set(Array.from(dropdown.selectedOptions).map(o => o.value))
-      : null;
-    const prevScroll = preserveScroll ? dropdown.scrollTop : 0;
+    channelList.innerHTML = '';
+    playlist.forEach((ch, idx) => {
+      const row = document.createElement('div');
+      row.className = 'channel-item';
+      row.dataset.url = ch.url;
+      row.dataset.index = String(idx);
+      if (selectedSet.has(ch.url)) row.classList.add('selected');
 
-    dropdown.innerHTML = '';
-    (playlist || []).forEach(ch => {
-      const opt = document.createElement('option');
-      opt.value = ch.url;
-      opt.text = ch.name + (ch.group ? ` — ${ch.group}` : '');
-      if (prevSelected && prevSelected.has(opt.value)) opt.selected = true;
-      dropdown.appendChild(opt);
+      const name = document.createElement('div');
+      name.className = 'channel-name';
+      name.textContent = ch.name + (ch.group ? ` — ${ch.group}` : '');
+
+      const btn = document.createElement('button');
+      btn.className = 'play-btn';
+      btn.title = 'Reproducir';
+      btn.textContent = '➤';
+      btn.dataset.url = ch.url;
+
+      row.appendChild(name);
+      row.appendChild(btn);
+      channelList.appendChild(row);
     });
 
     countLabel.textContent = String(playlist.length);
-
-    const hadPrevSelection = prevSelected && prevSelected.size > 0;
-    if (playlist.length && !hadPrevSelection) {
-      dropdown.selectedIndex = 0;
-      if (autoplayIfEmpty) playStream(playlist[0].url);
+    if (autoplayIfEmpty && playlist.length && !currentStream) {
+      playStream(playlist[0].url);
     }
+    if (preserveScroll) channelList.scrollTop = st;
+  }
 
-    if (preserveScroll) dropdown.scrollTop = prevScroll;
+  // Toggle selección al hacer click en la fila. Si clic en botón rojo, reproduce.
+  const clickPlayChk = document.getElementById('chkClickPlay');
+  clickPlayChk.checked = localStorage.getItem('clickPlay') === 'true';
+  clickPlayChk.addEventListener('change', ()=> localStorage.setItem('clickPlay', String(clickPlayChk.checked)));
+
+  channelList.addEventListener('click', (e)=>{
+    const btn = e.target.closest('.play-btn');
+    if(btn){
+      playStream(btn.dataset.url);
+      return;
+    }
+    const item = e.target.closest('.channel-item');
+    if(!item) return;
+    const url = item.dataset.url;
+    if(selectedSet.has(url)){ selectedSet.delete(url); item.classList.remove('selected'); }
+    else { selectedSet.add(url); item.classList.add('selected'); }
+
+    // clic reproduce (opcional)
+    if(clickPlayChk.checked) playStream(url);
+
+    // si está corriendo el auto-aleatorio, reinicia contador
+    if(autoRandom.running){ autoRandom.remaining = autoRandom.seconds; updateCountdownDisplay(`${autoRandom.remaining}s`); }
+  });
+
+  // Filtro con preservación de scroll
+  document.getElementById('searchBox').addEventListener('input', (e)=>{
+    const term = e.target.value.toLowerCase();
+    const st = channelList.scrollTop;
+    for(const row of channelList.children){
+      const txt = row.querySelector('.channel-name')?.textContent.toLowerCase() || '';
+      row.style.display = txt.includes(term) ? '' : 'none';
+    }
+    channelList.scrollTop = st;
+    requestAnimationFrame(()=>{ channelList.scrollTop = st; });
+  });
+
+  // Helpers selección
+  function getSelectedItems(){
+    if(!selectedSet.size) return [];
+    const map = new Map(playlist.map(ch => [ch.url, ch]));
+    return Array.from(selectedSet).map(u => map.get(u)).filter(Boolean);
+  }
+  function pickRandomFromSelection(){
+    const sel = getSelectedItems();
+    if(!sel.length){ alert('Selecciona uno o más canales en la lista.'); return null; }
+    return sel[Math.floor(Math.random()*sel.length)].url;
   }
 
   // ========= Temporizador Auto-Aleatorio =========
@@ -283,15 +364,11 @@
   if(randRangeInput) randRangeInput.addEventListener('input', e => syncSeconds(e.target.value));
 
   function updateCountdownDisplay(v){ if(countdownLabel) countdownLabel.textContent = `Próximo cambio en ${v}`; }
-  function pickRandomFromSelection(){
-    const selectedOptions = Array.from(dropdown.selectedOptions);
-    if(selectedOptions.length===0){ alert('Selecciona uno o más canales en la lista.'); return null; }
-    return selectedOptions[Math.floor(Math.random()*selectedOptions.length)].value;
-  }
+
   function startAutoRandom(){
     if(autoRandom.tick) clearInterval(autoRandom.tick);
-    const sel = Array.from(dropdown.selectedOptions);
-    if(sel.length===0) { alert('Selecciona uno o más canales para el modo Auto.'); return; }
+    const sel = getSelectedItems();
+    if(!sel.length) { alert('Selecciona uno o más canales para el modo Auto.'); return; }
     autoRandom.running = true;
     autoRandom.remaining = autoRandom.seconds;
     const first = pickRandomFromSelection();
@@ -334,13 +411,10 @@
     updateCountdownDisplay('—');
   }
 
-  // ========= Handlers base =========
-  const btnStartAuto = document.getElementById('btnStartAuto');
-  const btnPauseAuto = document.getElementById('btnPauseAuto');
-  const btnStopAuto = document.getElementById('btnStopAuto');
-  if(btnStartAuto) btnStartAuto.addEventListener('click', ()=>{ syncSeconds(randSecondsInput.value); startAutoRandom(); });
-  if(btnPauseAuto) btnPauseAuto.addEventListener('click', ()=>{ if(autoRandom.running) pauseAutoRandom(); else resumeAutoRandom(); });
-  if(btnStopAuto) btnStopAuto.addEventListener('click', stopAutoRandom);
+  // ========= Botones y handlers =========
+  document.getElementById('btnStartAuto').addEventListener('click', ()=>{ syncSeconds(randSecondsInput.value); startAutoRandom(); });
+  document.getElementById('btnPauseAuto').addEventListener('click', ()=>{ if(autoRandom.running) pauseAutoRandom(); else resumeAutoRandom(); });
+  document.getElementById('btnStopAuto').addEventListener('click', stopAutoRandom);
 
   const fileInputHandler = (evt)=>{
     const file = evt.target.files && evt.target.files[0];
@@ -352,80 +426,35 @@
         const items = M3U.parse(text);
         if(!items.length) throw new Error('Lista vacía o formato no reconocido');
         playlist = dedupeByUrl(items);
-        // Importar: preservar scroll/selección y no auto-reproducir
-        populateDropdown({ preserveSelection:true, preserveScroll:true, autoplayIfEmpty:false });
+        populateDropdown({preserveScroll:true, autoplayIfEmpty:false});
       }catch(err){ console.error(err); alert('Error al cargar el playlist. Verifica el formato .m3u/.m3u8'); }
     };
     reader.readAsText(file);
   };
   fileInput.addEventListener('change', fileInputHandler);
 
-  // ===== Filtro que preserva scroll (doble restauración) =====
-  document.getElementById('searchBox').addEventListener('input', (e)=>{
-    const term = e.target.value.toLowerCase();
-    const st = dropdown.scrollTop;
-    for(const opt of dropdown.options){
-      opt.style.display = opt.text.toLowerCase().includes(term) ? '' : 'none';
-    }
-    dropdown.scrollTop = st;
-    requestAnimationFrame(()=>{ dropdown.scrollTop = st; });
-  });
-
-  // Botones inferiores
   document.getElementById('btnPlay').addEventListener('click', ()=>{
-    const sel = dropdown.value; if(!sel) return alert('Selecciona un canal.');
-    playStream(sel);
+    const sel = getSelectedItems();
+    if(!sel.length) return alert('Selecciona uno o más canales.');
+    playStream(sel[0].url);
   });
-  document.getElementById('btnExportSel').addEventListener('click', exportSelectionM3U);
+  document.getElementById('btnPlayTop').addEventListener('click', ()=>{
+    const sel = getSelectedItems();
+    if(!sel.length) return alert('Selecciona uno o más canales.');
+    playStream(sel[0].url);
+  });
+  document.getElementById('btnRandomTop').addEventListener('click', ()=>{ const pick = pickRandomFromSelection(); if(pick) playStream(pick); });
+  document.getElementById('btnAleatorio').addEventListener('click', ()=>{ const pick = pickRandomFromSelection(); if(pick) playStream(pick); });
   document.getElementById('btnStop').addEventListener('click', ()=>{ video.pause(); });
   document.getElementById('btnFav').addEventListener('click', agregarAFavoritos);
 
-  // ===== Controles rápidos arriba =====
-  document.getElementById('btnPlayTop').addEventListener('click', ()=>{
-    const sel = dropdown.value; if(!sel) return alert('Selecciona un canal.');
-    playStream(sel);
-  });
-  document.getElementById('btnRandomTop').addEventListener('click', ()=>{
-    const pick = pickRandomFromSelection() || dropdown.value;
-    if(pick) playStream(pick);
-  });
-  const clickPlayChk = document.getElementById('chkClickPlay');
-  clickPlayChk.checked = localStorage.getItem('clickPlay') === 'true';
-  clickPlayChk.addEventListener('change', ()=> localStorage.setItem('clickPlay', String(clickPlayChk.checked)));
-
-  // ===== CLICK: handler con pointerdown + triple restauración de scroll =====
-  dropdown.addEventListener('pointerdown', (e) => {
-    const opt = e.target;
-    if (!opt || opt.tagName !== 'OPTION') return;
-
-    const st = dropdown.scrollTop;
-    e.preventDefault();            // evita comportamiento nativo
-    opt.selected = !opt.selected;  // toggle sin teclas
-
-    // restaurar scroll inmediatamente…
-    dropdown.scrollTop = st;
-    // …en el próximo frame…
-    requestAnimationFrame(() => {
-      dropdown.scrollTop = st;
-      // …y en micro-delay (Safari/TV webviews)
-      setTimeout(() => { dropdown.scrollTop = st; }, 0);
-    });
-
-    dropdown.dispatchEvent(new Event('change', { bubbles: true }));
-    if (clickPlayChk?.checked) playStream(opt.value);
-  });
-
-  // Doble clic / Enter / atajos
-  dropdown.addEventListener('dblclick', ()=>{ const v = dropdown.value; if(v) playStream(v); });
-  dropdown.addEventListener('keydown', (e)=>{
+  // Atajos de teclado sobre lista
+  channelList.addEventListener('keydown', (e)=>{
     const k = e.key.toLowerCase();
-    if(k === 'enter' || k === 'p'){ const v = dropdown.value; if(v){ e.preventDefault(); playStream(v);} }
-    else if(k === 'r'){ e.preventDefault(); const pick = pickRandomFromSelection() || dropdown.value; if(pick) playStream(pick); }
+    if(k === 'enter' || k === 'p'){ const sel = getSelectedItems(); if(sel.length){ e.preventDefault(); playStream(sel[0].url);} }
+    else if(k === 'r'){ e.preventDefault(); const pick = pickRandomFromSelection(); if(pick) playStream(pick); }
     else if(k === 'f'){ e.preventDefault(); agregarAFavoritos(); }
   });
-
-  // Reset del contador en auto-aleatorio al cambiar selección
-  dropdown.addEventListener('change', ()=>{ if(autoRandom.running){ autoRandom.remaining = autoRandom.seconds; updateCountdownDisplay(`${autoRandom.remaining}s`);} });
 
   function dedupeByUrl(arr){ const seen=new Set(); const out=[]; for(const x of arr){ if(x && x.url && !seen.has(x.url)){ seen.add(x.url); out.push(x); } } return out; }
 
@@ -433,9 +462,9 @@
   function savePlaylist(){
     const name = (document.getElementById('playlistName').value||'').trim();
     if(!name) return alert('Escribe un nombre para la playlist');
-    const selected = Array.from(dropdown.selectedOptions).map(opt => ({ name: opt.text, url: opt.value }));
+    const selected = getSelectedItems().map(ch => ({ name: ch.name, url: ch.url }));
     if(!selected.length) return alert('Selecciona al menos un canal');
-    localStorage.setItem(`playlist_${name}`, M3U.stringify(selected));
+    localStorage.setItem(`playlist_${name}`, JSON.stringify(selected));
     loadAllPlaylists();
     alert('Playlist guardada.');
   }
@@ -443,8 +472,13 @@
     if(!name) return;
     const saved = localStorage.getItem(`playlist_${name}`);
     if(saved){
-      playlist = M3U.parse(saved);
-      populateDropdown({ preserveSelection:true, preserveScroll:true, autoplayIfEmpty:false });
+      try{
+        const arr = JSON.parse(saved);
+        if(Array.isArray(arr)){ playlist = dedupeByUrl(arr); }
+        else { playlist = []; }
+      }catch{ playlist = []; }
+      selectedSet.clear();
+      populateDropdown({preserveScroll:true, autoplayIfEmpty:false});
     }
   }
   function deleteSelectedPlaylist(){
@@ -465,68 +499,98 @@
     loadFavoritos();
     loadAllCategories();
   }
+  document.getElementById('btnGuardarPL').addEventListener('click', savePlaylist);
+  document.getElementById('btnLoadPL').addEventListener('click', ()=> loadSavedPlaylist(savedPlaylistsDropdown.value));
+  document.getElementById('btnDeletePL').addEventListener('click', deleteSelectedPlaylist);
+  document.getElementById('btnExportPL').addEventListener('click', ()=>{
+    const name = savedPlaylistsDropdown.value || 'playlist';
+    downloadText(M3U.toM3U(playlist), `${name}.m3u`);
+  });
 
   // ========= Favoritos =========
   function agregarAFavoritos(){
     if(!currentStream) return alert('No hay canal reproduciéndose.');
     const canal = (playlist||[]).find(c => c.url===currentStream);
     const name = canal ? canal.name : (prompt('Nombre para el favorito:')||'Canal');
-    let favs = M3U.parse(localStorage.getItem('favoritos')||'[]');
+    let favs = [];
+    try{ favs = JSON.parse(localStorage.getItem('favoritos')||'[]'); }catch{}
     if(!favs.find(f => f.url===currentStream)) favs.push({ name, url: currentStream });
-    localStorage.setItem('favoritos', M3U.stringify(favs));
+    localStorage.setItem('favoritos', JSON.stringify(favs));
     loadFavoritos();
   }
   function loadFavoritos(){
     favoritosDropdown.innerHTML='';
-    const favs = M3U.parse(localStorage.getItem('favoritos')||'[]');
+    let favs=[]; try{ favs = JSON.parse(localStorage.getItem('favoritos')||'[]'); }catch{}
     for(const f of favs){ const o=document.createElement('option'); o.value=f.url; o.text=f.name; favoritosDropdown.appendChild(o); }
   }
   function reproducirFavorito(){ const url = favoritosDropdown.value; if(!url) return alert('Selecciona un canal favorito'); playStream(url); }
-  function eliminarFavorito(){ const url = favoritosDropdown.value; if(!url) return; let favs = M3U.parse(localStorage.getItem('favoritos')||'[]'); favs = favs.filter(f=>f.url!==url); localStorage.setItem('favoritos', M3U.stringify(favs)); loadFavoritos(); }
+  function eliminarFavorito(){
+    const url = favoritosDropdown.value; if(!url) return;
+    let favs=[]; try{ favs = JSON.parse(localStorage.getItem('favoritos')||'[]'); }catch{}
+    favs = favs.filter(f=>f.url!==url);
+    localStorage.setItem('favoritos', JSON.stringify(favs));
+    loadFavoritos();
+  }
+  document.getElementById('btnPlayFav').addEventListener('click', reproducirFavorito);
+  document.getElementById('btnDelFav').addEventListener('click', eliminarFavorito);
+  document.getElementById('btnExportFav').addEventListener('click', ()=>{
+    let favs=[]; try{ favs = JSON.parse(localStorage.getItem('favoritos')||'[]'); }catch{}
+    if(!favs.length) return alert('No hay favoritos.');
+    downloadText(M3U.toM3U(favs), 'favoritos.m3u');
+  });
 
-  // ========= Categorías =========
+  // ========= Categorías (arreglado) =========
   function createCategory(){
-    const name = (prompt('Nombre de la nueva categoría:')||'').trim();
+    let name = (prompt('Nombre de la nueva categoría:')||'').trim();
     if(!name) return;
+    // nombre seguro para key
+    name = name.replace(/\s+/g,' ').trim();
     const key = `cat_${name}`;
     if(!localStorage.getItem(key)){
-      localStorage.setItem(key, M3U.stringify([]));
+      localStorage.setItem(key, JSON.stringify([]));
       loadAllCategories();
       alert('Categoría creada.');
-    } else { alert('Ya existe una categoría con ese nombre.'); }
+    } else {
+      alert('Ya existe una categoría con ese nombre.');
+    }
   }
   function loadAllCategories(){
     categoryDropdown.innerHTML = '<option value="">Selecciona una categoría...</option>';
     for(const key of Object.keys(localStorage)){
       if(key.startsWith('cat_')){
-        const name = key.replace('cat_','');
+        const name = key.slice(4);
         const opt = document.createElement('option'); opt.value=name; opt.text=name; categoryDropdown.appendChild(opt);
       }
     }
   }
   function addToCategory(){
     const cat = categoryDropdown.value; if(!cat) return alert('Selecciona una categoría primero');
-    const selected = Array.from(dropdown.selectedOptions).map(opt => ({ name: opt.text, url: opt.value }));
-    let data = M3U.parse(localStorage.getItem(`cat_${cat}`)||'[]');
+    const selected = getSelectedItems().map(ch => ({ name: ch.name, url: ch.url }));
+    if(!selected.length) return alert('Selecciona al menos un canal');
+    const key = `cat_${cat}`;
+    let data=[]; try{ data = JSON.parse(localStorage.getItem(key)||'[]'); }catch{}
     for(const c of selected){ if(!data.find(d=>d.url===c.url)) data.push(c); }
-    localStorage.setItem(`cat_${cat}`, M3U.stringify(data));
+    localStorage.setItem(key, JSON.stringify(data));
     alert('Canales añadidos a la categoría');
     if(categoryDropdown.value===cat) loadCategoryChannels();
   }
   function loadCategoryChannels(){
     const cat = categoryDropdown.value; categoryChannelsList.innerHTML='';
     if(!cat) return;
-    const channels = M3U.parse(localStorage.getItem(`cat_${cat}`)||'[]');
+    let channels=[]; try{ channels = JSON.parse(localStorage.getItem(`cat_${cat}`)||'[]'); }catch{}
     for(const ch of channels){
       const li=document.createElement('li'); li.textContent=ch.name; li.style.cursor='pointer';
       li.onclick=()=> playStream(ch.url);
       categoryChannelsList.appendChild(li);
     }
   }
+  document.getElementById('btnNewCat').addEventListener('click', createCategory);
+  document.getElementById('btnAddToCat').addEventListener('click', addToCategory);
+  categoryDropdown.addEventListener('change', loadCategoryChannels);
 
   // ========= Exportaciones =========
   function exportSelectionM3U(){
-    const selected = Array.from(dropdown.selectedOptions).map(opt => ({ name: opt.text, url: opt.value }));
+    const selected = getSelectedItems().map(ch => ({ name: ch.name, url: ch.url }));
     if(!selected.length) return alert('Selecciona uno o más canales.');
     const text = M3U.toM3U(selected);
     downloadText(text, 'seleccion.m3u');
@@ -539,14 +603,11 @@
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
   }
+  document.getElementById('btnExportSel').addEventListener('click', exportSelectionM3U);
 
   // ========= Auto-carga de listas internas =========
   const INTERNAL_FILES = ['update2.m3u','xumo.m3u','xiaomi.m3u'];
-
-  function setInternalStatus(msg){
-    const el = document.getElementById('internalStatus');
-    if(el) el.textContent = msg;
-  }
+  function setInternalStatus(msg){ const el = document.getElementById('internalStatus'); if(el) el.textContent = msg; }
   function getSelectedInternal(){
     const items = Array.from(document.querySelectorAll('.internal-item'));
     const sel = items.filter(i => i.checked).map(i => i.value);
@@ -565,9 +626,7 @@
     const targets = getSelectedInternal();
     setInternalStatus('Cargando listas internas…');
 
-    const results = await Promise.allSettled(
-      targets.map(p => fetchTextNoStore(p, force))
-    );
+    const results = await Promise.allSettled(targets.map(p => fetchTextNoStore(p, force)));
 
     let all = [], ok = 0, notes = [];
     for(let i=0;i<results.length;i++){
@@ -585,16 +644,14 @@
     const finalList = dedupeByUrl(all);
     playlist = merge ? dedupeByUrl([...(playlist||[]), ...finalList]) : finalList;
 
-    // preserva selección y scroll al refrescar; no auto-play
-    populateDropdown({ preserveSelection: true, preserveScroll: true, autoplayIfEmpty: false });
-
+    populateDropdown({ preserveScroll: true, autoplayIfEmpty: false });
     setInternalStatus(ok ? `✅ ${finalList.length} canales (${ok}/${targets.length}) — ${notes.join(' · ')}` : '⚠️ No se pudo cargar (revisa nombres/rutas o abre por http://)');
   }
 
   // ========= Inicio =========
   window.addEventListener('load', ()=>{
     playlist = [];
-    populateDropdown(); // carga inicial
+    populateDropdown();
     loadAllPlaylists();
     syncSeconds(60);
 
